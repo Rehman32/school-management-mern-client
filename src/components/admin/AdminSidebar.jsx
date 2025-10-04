@@ -149,19 +149,6 @@ const Sidebar = ({ open, isDark, onItemClick, activeTab, setActiveTab }) => {
               )}
             </Link>
             <Link
-              to="/admin/attendance"
-              onClick={() => handleItemClick("timetable")}
-              className={getItemClasses("timetable")}
-            >
-              <Timer size={20} className={getIconClasses("timetable")} />
-              <span className="ml-3 font-medium">Timetable</span>
-              {activeTab === "timetable" && (
-                <div className="absolute right-2 w-2 h-2 bg-white rounded-full animate-pulse" />
-              )}
-            </Link>
-
-            {/* Fee Management */}
-            <Link
               to="/admin/fees"
               onClick={() => handleItemClick("fees")}
               className={getItemClasses("fees")}
@@ -172,33 +159,22 @@ const Sidebar = ({ open, isDark, onItemClick, activeTab, setActiveTab }) => {
                 <div className="absolute right-2 w-2 h-2 bg-white rounded-full animate-pulse" />
               )}
             </Link>
-
-            {/* Reports */}
+            
             <Link
-              to="/admin/reports"
-              onClick={() => handleItemClick("reports")}
-              className={getItemClasses("reports")}
+              to="/admin/timetable"
+              onClick={() => handleItemClick("timetable")}
+              className={getItemClasses("timetable")}
             >
-              <BarChart3 size={20} className={getIconClasses("reports")} />
-              <span className="ml-3 font-medium">Reports</span>
-              {activeTab === "reports" && (
+              <Timer size={20} className={getIconClasses("timetable")} />
+              <span className="ml-3 font-medium">Timetable</span>
+              {activeTab === "timetable" && (
                 <div className="absolute right-2 w-2 h-2 bg-white rounded-full animate-pulse" />
               )}
             </Link>
 
-            {/* Communications */}
-            <Link
-              to="/admin/communications"
-              onClick={() => handleItemClick("communications")}
-              className={getItemClasses("communications")}
-            >
-              <MessageSquare size={20} className={getIconClasses("communications")} />
-              <span className="ml-3 font-medium">Communications</span>
-              {activeTab === "communications" && (
-                <div className="absolute right-2 w-2 h-2 bg-white rounded-full animate-pulse" />
-              )}
-            </Link>
+            
 
+            
             {/* Settings */}
             <Link
               to="/admin/settings"

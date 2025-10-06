@@ -1,111 +1,408 @@
+
 import React, { useEffect, useState } from "react";
-import {
-  listAttendance,
-  markAttendance,
+import { 
+  markAttendance, 
+  markAllPresent, 
+  copyFromPreviousDay,
+  listAttendance, 
+  getClassReport,
+  getStudentReport,
   deleteAttendance,
+  updateAttendanceRecord
 } from "../../api/attendanceApi";
 import { listClasses } from "../../api/classApi";
 import { listStudents } from "../../api/studentApi";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
+import * as XLSX from "xlsx";
 import {
   FaUserCheck,
-  FaPlus,
   FaCalendarAlt,
-  FaFilter,
-  FaSync,
-  FaEdit,
-  FaTrash,
-  FaTimes,
   FaUsers,
-  FaChartBar,
   FaCheckCircle,
   FaTimesCircle,
   FaClock,
+  FaDownload,
+  FaChartBar,
   FaSearch,
+  FaFilter,
+  FaUserSlash,
+  FaUndoAlt,
+  FaCopy,
+  FaEdit,
+  FaTrash,
+  FaSave,
+  FaTimes,
+  FaUserClock,
+  FaExclamationTriangle,
 } from "react-icons/fa";
+import { useAuth } from "../../context/AuthContext";
 
-// This component receives isDark as a prop - matching your AdminDashboard pattern
+// Status configurations
+const STATUS_CONFIG = {
+  present: {
+    label: "Present",
+    icon: FaCheckCircle,
+    color: "green",
+    lightClass: "bg-green-100 text-green-700 border-green-200",
+    darkClass: "bg-green-900/30 text-green-400 border-green-800",
+    buttonLight: "bg-green-500 hover:bg-green-600",
+    buttonDark: "bg-green-600 hover:bg-green-700"
+  },
+  absent: {
+    label: "Absent",
+    icon: FaTimesCircle,
+    color: "red",
+    lightClass: "bg-red-100 text-red-700 border-red-200",
+    darkClass: "bg-red-900/30 text-red-400 border-red-800",
+    buttonLight: "bg-red-500 hover:bg-red-600",
+    buttonDark: "bg-red-600 hover:bg-red-700"
+  },
+  late: {
+    label: "Late",
+    icon: FaClock,
+    color: "yellow",
+    lightClass: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    darkClass: "bg-yellow-900/30 text-yellow-400 border-yellow-800",
+    buttonLight: "bg-yellow-500 hover:bg-yellow-600",
+    buttonDark: "bg-yellow-600 hover:bg-yellow-700"
+  },
+  "half-day": {
+    label: "Half Day",
+    icon: FaUserClock,
+    color: "blue",
+    lightClass: "bg-blue-100 text-blue-700 border-blue-200",
+    darkClass: "bg-blue-900/30 text-blue-400 border-blue-800",
+    buttonLight: "bg-blue-500 hover:bg-blue-600",
+    buttonDark: "bg-blue-600 hover:bg-blue-700"
+  },
+  excused: {
+    label: "Excused",
+    icon: FaExclamationTriangle,
+    color: "purple",
+    lightClass: "bg-purple-100 text-purple-700 border-purple-200",
+    darkClass: "bg-purple-900/30 text-purple-400 border-purple-800",
+    buttonLight: "bg-purple-500 hover:bg-purple-600",
+    buttonDark: "bg-purple-600 hover:bg-purple-700"
+  },
+  leave: {
+    label: "Leave",
+    icon: FaUserSlash,
+    color: "gray",
+    lightClass: "bg-gray-100 text-gray-700 border-gray-200",
+    darkClass: "bg-gray-900/30 text-gray-400 border-gray-800",
+    buttonLight: "bg-gray-500 hover:bg-gray-600",
+    buttonDark: "bg-gray-600 hover:bg-gray-700"
+  }
+};
+
 export default function AttendanceManagement({ isDark }) {
-  const [loading, setLoading] = useState(false);
-  const [attendance, setAttendance] = useState([]);
+  const { role } = useAuth();
+  const [view, setView] = useState("mark"); // mark, history, reports
   const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [students, setStudents] = useState([]);
-  const [filters, setFilters] = useState({ classId: "", date: "" });
-  const [showMarkModal, setShowMarkModal] = useState(false);
-  const [selectedAttendance, setSelectedAttendance] = useState(null);
+  const [attendance, setAttendance] = useState({});
+  const [remarks, setRemarks] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [classReport, setClassReport] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
-  const loadLookup = async () => {
-    try {
-      const c = await listClasses();
-      setClasses(c.data || c || []);
-      const sRes = await listStudents();
-      setStudents(sRes.data || sRes || []);
-    } catch (err) {
-      console.error("lookup load failed", err);
-      toast.error("Failed to load data");
+  // Get today's date as max date
+  const today = new Date().toISOString().split("T")[0];
+
+  // Fetch classes
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const res = await listClasses();
+        const data = res.data.data || res;
+        setClasses(data);
+        if (data.length > 0) {
+          setSelectedClass(data[0]._id);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load classes");
+      }
+    };
+    fetchClasses();
+  }, []);
+
+  // Fetch students when class changes
+  useEffect(() => {
+    if (selectedClass) {
+      fetchStudents();
     }
-  };
+  }, [selectedClass]);
 
-  const loadAttendance = async () => {
+  const fetchStudents = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (filters.classId) params.classId = filters.classId;
-      if (filters.date) params.date = filters.date;
-      const res = await listAttendance(params);
-      setAttendance(res.data || res || []);
+      const res = await listStudents({ class: selectedClass });
+      const data = res.data || res;
+      const activeStudents = data.filter(s => s.status === "active" || !s.status);
+      setStudents(activeStudents);
+      
+      // Initialize attendance state with "present" as default
+      const initialAttendance = {};
+      activeStudents.forEach(student => {
+        initialAttendance[student._id] = "present";
+      });
+      setAttendance(initialAttendance);
+      
+      // Check if attendance already exists for this date
+      if (selectedDate) {
+        await fetchExistingAttendance();
+      }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load attendance");
+      toast.error("Failed to load students");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadLookup();
-    loadAttendance();
-  }, []);
-
-  const openMark = (att) => {
-    setSelectedAttendance(att || null);
-    setShowMarkModal(true);
+  const fetchExistingAttendance = async () => {
+    try {
+      const res = await listAttendance({
+        classId: selectedClass,
+        date: selectedDate
+      });
+      
+      const data = res.data || [];
+      if (data.length > 0 && data[0].records) {
+        const existingAttendance = {};
+        const existingRemarks = {};
+        
+        data[0].records.forEach(record => {
+          existingAttendance[record.student._id || record.student] = record.status;
+          if (record.remark) {
+            existingRemarks[record.student._id || record.student] = record.remark;
+          }
+        });
+        
+        setAttendance(existingAttendance);
+        setRemarks(existingRemarks);
+        toast.success("Loaded existing attendance");
+      }
+    } catch (err) {
+      console.error(err);
+      // Don't show error, just means no attendance exists yet
+    }
   };
 
-  const handleMarkSubmit = async (payload) => {
+  // Handle attendance status change
+  const handleStatusChange = (studentId, status) => {
+    setAttendance(prev => ({
+      ...prev,
+      [studentId]: status
+    }));
+  };
+
+  // Handle remark change
+  const handleRemarkChange = (studentId, remark) => {
+    setRemarks(prev => ({
+      ...prev,
+      [studentId]: remark
+    }));
+  };
+
+  // Mark all present
+  const handleMarkAllPresent = async () => {
     try {
-      await markAttendance(payload);
+      setSaving(true);
+      await markAllPresent({
+        classId: selectedClass,
+        date: selectedDate
+      });
+      toast.success("All students marked present");
+      await fetchStudents();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to mark all present");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Mark all absent
+  const handleMarkAllAbsent = () => {
+    const newAttendance = {};
+    students.forEach(student => {
+      newAttendance[student._id] = "absent";
+    });
+    setAttendance(newAttendance);
+    toast.success("All students marked absent (not saved yet)");
+  };
+
+  // Copy from previous day
+  const handleCopyPrevious = async () => {
+    try {
+      setSaving(true);
+      await copyFromPreviousDay({
+        classId: selectedClass,
+        date: selectedDate
+      });
+      toast.success("Copied attendance from previous day");
+      await fetchStudents();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to copy attendance");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save attendance
+  const handleSaveAttendance = async () => {
+    if (!selectedClass || !selectedDate) {
+      toast.error("Please select class and date");
+      return;
+    }
+
+    // Validate date is not in future
+    if (selectedDate > today) {
+      toast.error("Cannot mark attendance for future dates");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      const records = students.map(student => ({
+        studentId: student._id,
+        status: attendance[student._id] || "present",
+        remark: remarks[student._id] || "",
+        checkInTime: attendance[student._id] === "present" || attendance[student._id] === "late" 
+          ? new Date().toISOString() 
+          : null
+      }));
+
+      await markAttendance({
+        classId: selectedClass,
+        date: selectedDate,
+        records,
+        session: "full-day"
+      });
+
       toast.success("Attendance saved successfully");
-      setShowMarkModal(false);
-      await loadAttendance();
     } catch (err) {
       console.error(err);
-      toast.error(err?.response?.data?.message || "Failed to save");
+      toast.error(err?.response?.data?.message || "Failed to save attendance");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("Delete this attendance record?")) return;
+  // Generate class report
+  const handleGenerateReport = async () => {
+    if (!selectedClass) {
+      toast.error("Please select a class");
+      return;
+    }
+
     try {
-      await deleteAttendance(id);
-      toast.success("Deleted successfully");
-      await loadAttendance();
+      setLoading(true);
+      
+      // Get last 30 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+      
+      const res = await getClassReport(selectedClass, {
+        startDate: startDate.toISOString().split("T")[0],
+        endDate: endDate.toISOString().split("T")[0]
+      });
+      
+      setClassReport(res.data);
+      setShowReportModal(true);
     } catch (err) {
       console.error(err);
-      toast.error("Delete failed");
+      toast.error("Failed to generate report");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Calculate stats
-  const totalRecords = attendance.reduce((sum, a) => sum + a.records.length, 0);
-  const presentCount = attendance.reduce(
-    (sum, a) => sum + a.records.filter((r) => r.status === "present").length,
-    0
+  // Export to Excel
+  const handleExportExcel = () => {
+    if (!classReport || !classReport.students) {
+      toast.error("No report data to export");
+      return;
+    }
+
+    try {
+      const exportData = classReport.students.map(student => ({
+        "Roll Number": student.rollNumber,
+        "Student Name": student.fullName,
+        "Total Days": student.total,
+        "Present": student.present,
+        "Absent": student.absent,
+        "Late": student.late,
+        "Half Day": student.halfDay || 0,
+        "Attendance %": student.percentage + "%"
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 12 },
+        { wch: 25 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 15 }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance Report");
+
+      const selectedClassName = classes.find(c => c._id === selectedClass)?.name || "Class";
+      const filename = `Attendance_Report_${selectedClassName}_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+      toast.success("Report exported successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export report");
+    }
+  };
+
+  // Get status badge
+  const getStatusBadge = (status) => {
+    const config = STATUS_CONFIG[status] || STATUS_CONFIG.present;
+    const Icon = config.icon;
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full border ${
+          isDark ? config.darkClass : config.lightClass
+        }`}
+      >
+        <Icon className="text-sm" />
+        {config.label}
+      </span>
+    );
+  };
+
+  // Filter students
+  const filteredStudents = students.filter(student =>
+    student.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const absentCount = attendance.reduce(
-    (sum, a) => sum + a.records.filter((r) => r.status === "absent").length,
-    0
-  );
+
+  // Calculate statistics
+  const stats = {
+    total: students.length,
+    present: Object.values(attendance).filter(s => s === "present").length,
+    absent: Object.values(attendance).filter(s => s === "absent").length,
+    late: Object.values(attendance).filter(s => s === "late").length,
+    halfDay: Object.values(attendance).filter(s => s === "half-day").length,
+  };
 
   return (
     <div
@@ -113,20 +410,16 @@ export default function AttendanceManagement({ isDark }) {
         isDark ? "bg-gray-900" : "bg-gray-50"
       }`}
     >
-      <Toaster position="top-right" />
-
-      {/* Header - Matching AcademicsManagement pattern */}
+      {/* Header */}
       <div
         className={`border-b shadow-sm ${
-          isDark
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
+          isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
         }`}
       >
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl shadow-lg">
+              <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg">
                 <FaUserCheck className="text-white text-2xl" />
               </div>
               <div>
@@ -142,31 +435,37 @@ export default function AttendanceManagement({ isDark }) {
                     isDark ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  Track and manage student attendance records
+                  Mark and track student attendance
                 </p>
               </div>
             </div>
-            <div className="flex gap-3">
+
+            {/* View Toggle */}
+            <div className="flex gap-2">
               <button
-                onClick={() => openMark(null)}
-                className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-md transition-all duration-200 hover:shadow-lg"
+                onClick={() => setView("mark")}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  view === "mark"
+                    ? "bg-blue-600 text-white"
+                    : isDark
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
               >
-                <FaPlus className="text-sm" />
-                <span className="hidden sm:inline">Mark Attendance</span>
+                Mark Attendance
               </button>
               <button
-                onClick={loadAttendance}
-                disabled={loading}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-medium transition-all duration-200 ${
-                  isDark
-                    ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                onClick={() => setView("reports")}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  view === "reports"
+                    ? "bg-blue-600 text-white"
+                    : isDark
+                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
               >
-                <FaSync className={`text-sm ${loading ? "animate-spin" : ""}`} />
-                <span className="hidden sm:inline">
-                  {loading ? "Loading..." : "Refresh"}
-                </span>
+                <FaChartBar className="inline mr-2" />
+                Reports
               </button>
             </div>
           </div>
@@ -174,619 +473,441 @@ export default function AttendanceManagement({ isDark }) {
       </div>
 
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div
-            className={`rounded-xl shadow-md p-6 border transition-all duration-200 hover:shadow-lg ${
-              isDark
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-100"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className={`text-sm font-medium ${
-                    isDark ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Total Records
-                </p>
-                <p
-                  className={`text-3xl font-bold mt-2 ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {totalRecords}
-                </p>
-              </div>
-              <div
-                className={`p-3 rounded-xl ${
-                  isDark ? "bg-blue-900/30" : "bg-blue-100"
-                }`}
-              >
-                <FaChartBar
-                  className={`text-2xl ${
-                    isDark ? "text-blue-400" : "text-blue-600"
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={`rounded-xl shadow-md p-6 border transition-all duration-200 hover:shadow-lg ${
-              isDark
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-100"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className={`text-sm font-medium ${
-                    isDark ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Present
-                </p>
-                <p
-                  className={`text-3xl font-bold mt-2 ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {presentCount}
-                </p>
-              </div>
-              <div
-                className={`p-3 rounded-xl ${
-                  isDark ? "bg-green-900/30" : "bg-green-100"
-                }`}
-              >
-                <FaCheckCircle
-                  className={`text-2xl ${
-                    isDark ? "text-green-400" : "text-green-600"
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={`rounded-xl shadow-md p-6 border transition-all duration-200 hover:shadow-lg ${
-              isDark
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-100"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className={`text-sm font-medium ${
-                    isDark ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Absent
-                </p>
-                <p
-                  className={`text-3xl font-bold mt-2 ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {absentCount}
-                </p>
-              </div>
-              <div
-                className={`p-3 rounded-xl ${
-                  isDark ? "bg-rose-900/30" : "bg-rose-100"
-                }`}
-              >
-                <FaTimesCircle
-                  className={`text-2xl ${
-                    isDark ? "text-rose-400" : "text-rose-600"
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div
-          className={`mb-6 p-6 rounded-2xl border shadow-md ${
-            isDark
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <FaFilter
-              className={isDark ? "text-gray-400" : "text-gray-600"}
-            />
-            <h3
-              className={`text-lg font-semibold ${
-                isDark ? "text-white" : "text-gray-900"
+        {view === "mark" && (
+          <>
+            {/* Controls */}
+            <div
+              className={`mb-6 p-6 rounded-2xl border shadow-md ${
+                isDark
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
               }`}
             >
-              Filters
-            </h3>
-          </div>
-          <div className="flex flex-col md:flex-row gap-3 items-end">
-            <div className="flex-1">
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Select Class
-              </label>
-              <select
-                value={filters.classId}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, classId: e.target.value }))
-                }
-                className={`w-full px-4 py-2.5 rounded-xl border transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                  isDark
-                    ? "border-gray-600 bg-gray-700 text-white"
-                    : "border-gray-300 bg-white text-gray-900"
-                }`}
-              >
-                <option value="">All classes</option>
-                {classes.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.grade} {c.section || c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Class Selector */}
+                <div>
+                  <label
+                    className={`block text-sm font-medium mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    <FaUsers className="inline mr-2" />
+                    Select Class
+                  </label>
+                  <select
+                    value={selectedClass}
+                    onChange={(e) => setSelectedClass(e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark
+                        ? "border-gray-600 bg-gray-700 text-white"
+                        : "border-gray-300 bg-white text-gray-900"
+                    }`}
+                  >
+                    <option value="">Select a class</option>
+                    {classes.map((cls) => (
+                      <option key={cls._id} value={cls._id}>
+                        {cls.name || `${cls.grade} - ${cls.section}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Selector */}
+                <div>
+                  <label
+                    className={`block text-sm font-medium mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    <FaCalendarAlt className="inline mr-2" />
+                    Select Date
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    max={today}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark
+                        ? "border-gray-600 bg-gray-700 text-white"
+                        : "border-gray-300 bg-white text-gray-900"
+                    }`}
+                  />
+                </div>
+
+                {/* Search */}
+                <div>
+                  <label
+                    className={`block text-sm font-medium mb-2 ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    <FaSearch className="inline mr-2" />
+                    Search Student
+                  </label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by name or roll number..."
+                    className={`w-full px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isDark
+                        ? "border-gray-600 bg-gray-700 text-white placeholder-gray-500"
+                        : "border-gray-300 bg-white text-gray-900 placeholder-gray-400"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  onClick={handleMarkAllPresent}
+                  disabled={!selectedClass || saving}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FaCheckCircle />
+                  Mark All Present
+                </button>
+                <button
+                  onClick={handleMarkAllAbsent}
+                  disabled={!selectedClass}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FaTimesCircle />
+                  Mark All Absent
+                </button>
+                <button
+                  onClick={handleCopyPrevious}
+                  disabled={!selectedClass || saving}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FaCopy />
+                  Copy Previous Day
+                </button>
+              </div>
             </div>
-            <div className="flex-1">
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Select Date
-              </label>
-              <div className="relative">
-                <FaCalendarAlt
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                />
-                <input
-                  type="date"
-                  value={filters.date}
-                  onChange={(e) =>
-                    setFilters((f) => ({ ...f, date: e.target.value }))
-                  }
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+
+            {/* Statistics Cards */}
+            {selectedClass && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <div
+                  className={`p-4 rounded-xl border ${
                     isDark
-                      ? "border-gray-600 bg-gray-700 text-white"
-                      : "border-gray-300 bg-white text-gray-900"
-                  }`}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={loadAttendance}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium shadow-md transition-all duration-200 hover:shadow-lg"
-              >
-                <FaFilter className="text-sm" />
-                Apply
-              </button>
-              <button
-                onClick={() => {
-                  setFilters({ classId: "", date: "" });
-                  loadAttendance();
-                }}
-                className={`px-6 py-2.5 rounded-xl border font-medium transition-all duration-200 ${
-                  isDark
-                    ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Attendance Table */}
-        <div
-          className={`rounded-2xl border shadow-md overflow-hidden ${
-            isDark
-              ? "bg-gray-800 border-gray-700"
-              : "bg-white border-gray-200"
-          }`}
-        >
-          <div
-            className={`p-6 border-b ${
-              isDark ? "border-gray-700" : "border-gray-200"
-            }`}
-          >
-            <h3
-              className={`text-lg font-semibold ${
-                isDark ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Attendance Records
-            </h3>
-            <p
-              className={`text-sm mt-1 ${
-                isDark ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              View and manage all attendance entries
-            </p>
-          </div>
-
-          {attendance.length === 0 ? (
-            <div className="p-16 text-center">
-              <div
-                className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-                  isDark ? "bg-gray-700" : "bg-gray-100"
-                }`}
-              >
-                <FaUserCheck
-                  className={`text-2xl ${
-                    isDark ? "text-gray-500" : "text-gray-400"
-                  }`}
-                />
-              </div>
-              <h3
-                className={`text-lg font-medium mb-2 ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                No attendance records found
-              </h3>
-              <p
-                className={`mb-6 ${
-                  isDark ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                Start by marking attendance for your classes
-              </p>
-              <button
-                onClick={() => openMark(null)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium rounded-xl shadow-md transition-all duration-200"
-              >
-                <FaPlus />
-                Mark Attendance
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table
-                className={`min-w-full divide-y ${
-                  isDark ? "divide-gray-700" : "divide-gray-200"
-                }`}
-              >
-                <thead className={isDark ? "bg-gray-900/50" : "bg-gray-50"}>
-                  <tr>
-                    <th
-                      className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Date
-                    </th>
-                    <th
-                      className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Class
-                    </th>
-                    <th
-                      className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Students
-                    </th>
-                    <th
-                      className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Status
-                    </th>
-                    <th
-                      className={`px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider ${
-                        isDark ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody
-                  className={`divide-y ${
-                    isDark
-                      ? "bg-gray-800 divide-gray-700"
-                      : "bg-white divide-gray-200"
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-200"
                   }`}
                 >
-                  {attendance.map((a) => {
-                    const present = a.records.filter(
-                      (r) => r.status === "present"
-                    ).length;
-                    const absent = a.records.filter(
-                      (r) => r.status === "absent"
-                    ).length;
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                      {stats.total}
+                    </div>
+                    <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      Total
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`p-4 rounded-xl border border-green-200 ${
+                    isDark ? "bg-green-900/20" : "bg-green-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${isDark ? "text-green-400" : "text-green-700"}`}>
+                      {stats.present}
+                    </div>
+                    <div className={`text-sm ${isDark ? "text-green-400" : "text-green-600"}`}>
+                      Present
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`p-4 rounded-xl border border-red-200 ${
+                    isDark ? "bg-red-900/20" : "bg-red-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${isDark ? "text-red-400" : "text-red-700"}`}>
+                      {stats.absent}
+                    </div>
+                    <div className={`text-sm ${isDark ? "text-red-400" : "text-red-600"}`}>
+                      Absent
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`p-4 rounded-xl border border-yellow-200 ${
+                    isDark ? "bg-yellow-900/20" : "bg-yellow-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${isDark ? "text-yellow-400" : "text-yellow-700"}`}>
+                      {stats.late}
+                    </div>
+                    <div className={`text-sm ${isDark ? "text-yellow-400" : "text-yellow-600"}`}>
+                      Late
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`p-4 rounded-xl border border-blue-200 ${
+                    isDark ? "bg-blue-900/20" : "bg-blue-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${isDark ? "text-blue-400" : "text-blue-700"}`}>
+                      {stats.halfDay}
+                    </div>
+                    <div className={`text-sm ${isDark ? "text-blue-400" : "text-blue-600"}`}>
+                      Half Day
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                    return (
-                      <tr
-                        key={a._id}
-                        className={`transition-colors duration-150 ${
-                          isDark ? "hover:bg-gray-700/50" : "hover:bg-gray-50"
-                        }`}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <FaCalendarAlt
-                              className={
-                                isDark ? "text-gray-500" : "text-gray-400"
-                              }
-                            />
+            {/* Student List */}
+            <div
+              className={`rounded-2xl border shadow-md overflow-hidden ${
+                isDark
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <div
+                className={`p-6 border-b flex justify-between items-center ${
+                  isDark ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <div>
+                  <h3
+                    className={`text-lg font-semibold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Students ({filteredStudents.length})
+                  </h3>
+                  <p
+                    className={`text-sm mt-1 ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Mark attendance for each student
+                  </p>
+                </div>
+                <button
+                  onClick={handleSaveAttendance}
+                  disabled={!selectedClass || saving}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium shadow-md transition-all ${
+                    saving
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  }`}
+                >
+                  <FaSave />
+                  {saving ? "Saving..." : "Save Attendance"}
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="p-16 text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  <p
+                    className={`mt-4 ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Loading students...
+                  </p>
+                </div>
+              ) : !selectedClass ? (
+                <div className="p-16 text-center">
+                  <FaUsers
+                    className={`mx-auto text-5xl mb-4 ${
+                      isDark ? "text-gray-600" : "text-gray-400"
+                    }`}
+                  />
+                  <p
+                    className={`text-lg ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Please select a class to mark attendance
+                  </p>
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="p-16 text-center">
+                  <p
+                    className={`text-lg ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    No students found
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table
+                    className={`min-w-full divide-y ${
+                      isDark ? "divide-gray-700" : "divide-gray-200"
+                    }`}
+                  >
+                    <thead className={isDark ? "bg-gray-900/50" : "bg-gray-50"}>
+                      <tr>
+                        <th
+                          className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                            isDark ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          Roll No.
+                        </th>
+                        <th
+                          className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                            isDark ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          Student Name
+                        </th>
+                        <th
+                          className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                            isDark ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          Status
+                        </th>
+                        <th
+                          className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                            isDark ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          Remark
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      className={`divide-y ${
+                        isDark
+                          ? "bg-gray-800 divide-gray-700"
+                          : "bg-white divide-gray-200"
+                      }`}
+                    >
+                      {filteredStudents.map((student) => (
+                        <tr
+                          key={student._id}
+                          className={`transition-colors ${
+                            isDark ? "hover:bg-gray-700/50" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <span
                               className={`text-sm font-medium ${
                                 isDark ? "text-white" : "text-gray-900"
                               }`}
                             >
-                              {new Date(a.date).toLocaleDateString("en-US", {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              })}
+                              {student.rollNumber}
                             </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`p-2 rounded-lg ${
-                                isDark ? "bg-purple-900/30" : "bg-purple-100"
-                              }`}
-                            >
-                              <FaUsers
-                                className={
-                                  isDark ? "text-purple-400" : "text-purple-600"
-                                }
-                              />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                                  isDark
+                                    ? "bg-gray-700 text-gray-300"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {student.fullName?.charAt(0) || "?"}
+                              </div>
+                              <span
+                                className={`text-sm font-medium ${
+                                  isDark ? "text-white" : "text-gray-900"
+                                }`}
+                              >
+                                {student.fullName}
+                              </span>
                             </div>
-                            <span
-                              className={`text-sm ${
-                                isDark ? "text-gray-300" : "text-gray-700"
-                              }`}
-                            >
-                              {a.classId
-                                ? `${a.classId.grade} ${
-                                    a.classId.section || ""
-                                  }`
-                                : "-"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-3 py-1 text-sm font-medium rounded-full ${
-                              isDark
-                                ? "text-blue-400 bg-blue-900/30"
-                                : "text-blue-700 bg-blue-100"
-                            }`}
-                          >
-                            {a.records.length} students
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2 flex-wrap">
+                              {Object.entries(STATUS_CONFIG).map(([status, config]) => (
+                                <button
+                                  key={status}
+                                  onClick={() => handleStatusChange(student._id, status)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    attendance[student._id] === status
+                                      ? `text-white ${isDark ? config.buttonDark : config.buttonLight}`
+                                      : isDark
+                                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                  }`}
+                                >
+                                  {config.label}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={remarks[student._id] || ""}
+                              onChange={(e) =>
+                                handleRemarkChange(student._id, e.target.value)
+                              }
+                              placeholder="Add remark..."
+                              className={`w-full px-3 py-1.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-blue-500 ${
                                 isDark
-                                  ? "text-green-400 bg-green-900/30"
-                                  : "text-green-700 bg-green-100"
+                                  ? "border-gray-600 bg-gray-700 text-white placeholder-gray-500"
+                                  : "border-gray-300 bg-white text-gray-900 placeholder-gray-400"
                               }`}
-                            >
-                              <FaCheckCircle /> {present}
-                            </span>
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
-                                isDark
-                                  ? "text-rose-400 bg-rose-900/30"
-                                  : "text-rose-700 bg-rose-100"
-                              }`}
-                            >
-                              <FaTimesCircle /> {absent}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="inline-flex gap-2">
-                            <button
-                              onClick={() => openMark(a)}
-                              className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                                isDark
-                                  ? "text-blue-400 hover:bg-blue-900/20"
-                                  : "text-blue-600 hover:bg-blue-50"
-                              }`}
-                            >
-                              <FaEdit />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(a._id)}
-                              className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                                isDark
-                                  ? "text-rose-400 hover:bg-rose-900/20"
-                                  : "text-rose-600 hover:bg-rose-50"
-                              }`}
-                            >
-                              <FaTrash />
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </>
+        )}
 
-      {/* Mark Modal */}
-      {showMarkModal && (
-        <MarkModal
-          isOpen={showMarkModal}
-          onClose={() => setShowMarkModal(false)}
-          attendance={selectedAttendance}
-          students={students}
-          classes={classes}
-          onSubmit={handleMarkSubmit}
-          isDark={isDark}
-        />
-      )}
-    </div>
-  );
-}
-
-// Enhanced MarkModal component - also receives isDark as prop
-function MarkModal({
-  isOpen,
-  onClose,
-  attendance,
-  students,
-  classes,
-  onSubmit,
-  isDark,
-}) {
-  const [classId, setClassId] = useState(attendance?.classId?._id || "");
-  const [date, setDate] = useState(
-    attendance
-      ? new Date(attendance.date).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0]
-  );
-  const [records, setRecords] = useState(() => {
-    if (attendance && attendance.records) {
-      return attendance.records.map((r) => ({
-        studentId: r.student?._id || r.student,
-        status: r.status,
-        remark: r.remark || "",
-      }));
-    }
-    return students.slice(0, 50).map((s) => ({
-      studentId: s._id,
-      status: "present",
-      remark: "",
-    }));
-  });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-
-  useEffect(() => {
-    if (!attendance && students.length) {
-      setRecords(
-        students.slice(0, 50).map((s) => ({
-          studentId: s._id,
-          status: "present",
-          remark: "",
-        }))
-      );
-    }
-  }, [attendance, students]);
-
-  const toggleStatus = (i, value) => {
-    setRecords((rs) => {
-      const copy = [...rs];
-      copy[i].status = value;
-      return copy;
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!classId) {
-      toast.error("Please select a class");
-      return;
-    }
-    await onSubmit({ classId, date, records });
-  };
-
-  const filteredRecords = records.filter((r, i) => {
-    const student = students.find((s) => s._id === r.studentId);
-    const matchesSearch =
-      !searchTerm ||
-      student?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student?.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === "all" || r.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  const presentCount = records.filter((r) => r.status === "present").length;
-  const absentCount = records.filter((r) => r.status === "absent").length;
-  const lateCount = records.filter((r) => r.status === "late").length;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div
-        className={`rounded-2xl max-w-4xl w-full shadow-2xl border overflow-hidden ${
-          isDark
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
-      >
-        {/* Modal Header */}
-        <div
-          className={`p-6 border-b ${
-            isDark
-              ? "border-gray-700 bg-gradient-to-r from-green-900/20 to-emerald-900/20"
-              : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"
-          }`}
-        >
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl">
-                <FaUserCheck className="text-white text-xl" />
-              </div>
+        {view === "reports" && (
+          <div
+            className={`rounded-2xl border shadow-md p-6 ${
+              isDark
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
+            <div className="flex justify-between items-center mb-6">
               <div>
                 <h3
-                  className={`text-xl font-bold ${
+                  className={`text-lg font-semibold ${
                     isDark ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  Mark Attendance
+                  Attendance Reports
                 </h3>
                 <p
-                  className={`text-sm mt-0.5 ${
+                  className={`text-sm mt-1 ${
                     isDark ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  {attendance ? "Edit existing record" : "Create new record"}
+                  View detailed attendance statistics
                 </p>
               </div>
+              <button
+                onClick={handleGenerateReport}
+                disabled={!selectedClass || loading}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FaChartBar />
+                Generate Report
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className={`p-2 rounded-lg transition-colors ${
-                isDark
-                  ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <FaTimes className="text-xl" />
-            </button>
-          </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Class and Date Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+            {/* Class selector for reports */}
+            <div className="mb-6">
               <label
                 className={`block text-sm font-medium mb-2 ${
                   isDark ? "text-gray-300" : "text-gray-700"
@@ -795,277 +916,309 @@ function MarkModal({
                 Select Class
               </label>
               <select
-                value={classId}
-                onChange={(e) => setClassId(e.target.value)}
-                required
-                className={`w-full px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className={`w-full md:w-1/3 px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-blue-500 ${
                   isDark
                     ? "border-gray-600 bg-gray-700 text-white"
                     : "border-gray-300 bg-white text-gray-900"
                 }`}
               >
-                <option value="">Select class</option>
-                {classes.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.grade} {c.section || c.name}
+                <option value="">Select a class</option>
+                {classes.map((cls) => (
+                  <option key={cls._id} value={cls._id}>
+                    {cls.name || `${cls.grade} - ${cls.section}`}
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label
-                className={`block text-sm font-medium mb-2 ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Date
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className={`w-full px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                  isDark
-                    ? "border-gray-600 bg-gray-700 text-white"
-                    : "border-gray-300 bg-white text-gray-900"
-                }`}
-              />
-            </div>
-          </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div
-              className={`p-4 rounded-xl border ${
-                isDark
-                  ? "bg-green-900/20 border-green-800"
-                  : "bg-green-50 border-green-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaCheckCircle
-                  className={isDark ? "text-green-400" : "text-green-600"}
+            {!selectedClass ? (
+              <div className="text-center py-16">
+                <FaChartBar
+                  className={`mx-auto text-5xl mb-4 ${
+                    isDark ? "text-gray-600" : "text-gray-400"
+                  }`}
                 />
-                <div>
-                  <p
-                    className={`text-xs font-medium ${
-                      isDark ? "text-green-400" : "text-green-700"
-                    }`}
-                  >
-                    Present
-                  </p>
-                  <p
-                    className={`text-2xl font-bold ${
-                      isDark ? "text-green-300" : "text-green-800"
-                    }`}
-                  >
-                    {presentCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div
-              className={`p-4 rounded-xl border ${
-                isDark
-                  ? "bg-rose-900/20 border-rose-800"
-                  : "bg-rose-50 border-rose-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaTimesCircle
-                  className={isDark ? "text-rose-400" : "text-rose-600"}
-                />
-                <div>
-                  <p
-                    className={`text-xs font-medium ${
-                      isDark ? "text-rose-400" : "text-rose-700"
-                    }`}
-                  >
-                    Absent
-                  </p>
-                  <p
-                    className={`text-2xl font-bold ${
-                      isDark ? "text-rose-300" : "text-rose-800"
-                    }`}
-                  >
-                    {absentCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div
-              className={`p-4 rounded-xl border ${
-                isDark
-                  ? "bg-amber-900/20 border-amber-800"
-                  : "bg-amber-50 border-amber-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FaClock
-                  className={isDark ? "text-amber-400" : "text-amber-600"}
-                />
-                <div>
-                  <p
-                    className={`text-xs font-medium ${
-                      isDark ? "text-amber-400" : "text-amber-700"
-                    }`}
-                  >
-                    Late
-                  </p>
-                  <p
-                    className={`text-2xl font-bold ${
-                      isDark ? "text-amber-300" : "text-amber-800"
-                    }`}
-                  >
-                    {lateCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1 relative">
-              <FaSearch
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                  isDark ? "text-gray-500" : "text-gray-400"
-                }`}
-              />
-              <input
-                type="text"
-                placeholder="Search students..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                  isDark
-                    ? "border-gray-600 bg-gray-700 text-white placeholder-gray-500"
-                    : "border-gray-300 bg-white text-gray-900 placeholder-gray-400"
-                }`}
-              />
-            </div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className={`px-4 py-2.5 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                isDark
-                  ? "border-gray-600 bg-gray-700 text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-              }`}
-            >
-              <option value="all">All Status</option>
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-              <option value="late">Late</option>
-            </select>
-          </div>
-
-          {/* Students List */}
-          <div
-            className={`max-h-96 overflow-y-auto border rounded-xl p-4 space-y-2 ${
-              isDark ? "border-gray-700" : "border-gray-200"
-            }`}
-          >
-            {filteredRecords.map((r, i) => {
-              const student = students.find((s) => s._id === r.studentId);
-              const originalIndex = records.findIndex(
-                (rec) => rec.studentId === r.studentId
-              );
-
-              return (
-                <div
-                  key={r.studentId}
-                  className={`flex items-center justify-between gap-4 p-3 rounded-lg transition-all duration-200 ${
-                    isDark
-                      ? "bg-gray-700/50 hover:bg-gray-700"
-                      : "bg-gray-50 hover:bg-gray-100"
+                <p
+                  className={`text-lg ${
+                    isDark ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                        isDark
-                          ? "bg-gray-600 text-gray-300"
-                          : "bg-gray-200 text-gray-700"
-                      }`}
-                    >
-                      {student?.fullName?.charAt(0) || "?"}
-                    </div>
-                    <div>
-                      <div
-                        className={`font-medium ${
-                          isDark ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {student?.fullName || "Student"}
-                      </div>
-                      <div
-                        className={`text-xs ${
-                          isDark ? "text-gray-400" : "text-gray-500"
-                        }`}
-                      >
-                        Roll No: {student?.rollNumber || "N/A"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={r.status}
-                      onChange={(e) =>
-                        toggleStatus(originalIndex, e.target.value)
-                      }
-                      className={`px-3 py-1.5 border rounded-lg text-sm font-medium transition-all duration-200 outline-none focus:ring-2 focus:ring-green-500 ${
-                        r.status === "present"
-                          ? isDark
-                            ? "bg-green-900/30 border-green-700 text-green-400"
-                            : "bg-green-50 border-green-300 text-green-700"
-                          : r.status === "absent"
-                          ? isDark
-                            ? "bg-rose-900/30 border-rose-700 text-rose-400"
-                            : "bg-rose-50 border-rose-300 text-rose-700"
-                          : isDark
-                          ? "bg-amber-900/30 border-amber-700 text-amber-400"
-                          : "bg-amber-50 border-amber-300 text-amber-700"
-                      }`}
-                    >
-                      <option value="present">Present</option>
-                      <option value="absent">Absent</option>
-                      <option value="late">Late</option>
-                    </select>
-                  </div>
-                </div>
-              );
-            })}
+                  Select a class and generate report to view statistics
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <p
+                  className={`text-lg ${
+                    isDark ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Click "Generate Report" to view attendance statistics for the last 30 days
+                </p>
+              </div>
+            )}
           </div>
+        )}
+      </div>
 
-          {/* Form Actions */}
+      {/* Report Modal */}
+      {showReportModal && classReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div
-            className={`flex justify-end gap-3 pt-4 border-t ${
-              isDark ? "border-gray-700" : "border-gray-200"
+            className={`rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl border ${
+              isDark
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
             }`}
           >
-            <button
-              type="button"
-              onClick={onClose}
-              className={`px-6 py-2.5 rounded-xl border font-medium transition-all duration-200 ${
+            {/* Modal Header */}
+            <div
+              className={`p-6 border-b ${
                 isDark
-                  ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  ? "border-gray-700 bg-gradient-to-r from-blue-900/20 to-indigo-900/20"
+                  : "border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50"
               }`}
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium shadow-md transition-all duration-200 hover:shadow-lg"
-            >
-              <FaUserCheck />
-              Save Attendance
-            </button>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3
+                    className={`text-xl font-bold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Attendance Report (Last 30 Days)
+                  </h3>
+                  <p
+                    className={`text-sm mt-1 ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    {classes.find(c => c._id === selectedClass)?.name || "Class Report"}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleExportExcel}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
+                  >
+                    <FaDownload />
+                    Export Excel
+                  </button>
+                  <button
+                    onClick={() => setShowReportModal(false)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isDark
+                        ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <FaTimes className="text-xl" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {/* Class Statistics */}
+              {classReport.classStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div
+                    className={`p-4 rounded-xl border ${
+                      isDark
+                        ? "bg-gray-700 border-gray-600"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                        {classReport.classStats.totalDays}
+                      </div>
+                      <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                        Total Days
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`p-4 rounded-xl border border-green-200 ${
+                      isDark ? "bg-green-900/20" : "bg-green-50"
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${isDark ? "text-green-400" : "text-green-700"}`}>
+                        {classReport.classStats.totalPresent}
+                      </div>
+                      <div className={`text-sm ${isDark ? "text-green-400" : "text-green-600"}`}>
+                        Total Present
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`p-4 rounded-xl border border-red-200 ${
+                      isDark ? "bg-red-900/20" : "bg-red-50"
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${isDark ? "text-red-400" : "text-red-700"}`}>
+                        {classReport.classStats.totalAbsent}
+                      </div>
+                      <div className={`text-sm ${isDark ? "text-red-400" : "text-red-600"}`}>
+                        Total Absent
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`p-4 rounded-xl border border-yellow-200 ${
+                      isDark ? "bg-yellow-900/20" : "bg-yellow-50"
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${isDark ? "text-yellow-400" : "text-yellow-700"}`}>
+                        {classReport.classStats.totalLate}
+                      </div>
+                      <div className={`text-sm ${isDark ? "text-yellow-400" : "text-yellow-600"}`}>
+                        Total Late
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Student-wise Report */}
+              <div className="overflow-x-auto">
+                <table
+                  className={`min-w-full divide-y ${
+                    isDark ? "divide-gray-700" : "divide-gray-200"
+                  }`}
+                >
+                  <thead className={isDark ? "bg-gray-900/50" : "bg-gray-50"}>
+                    <tr>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Roll No.
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Student Name
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Total
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Present
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Absent
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Late
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Percentage
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    className={`divide-y ${
+                      isDark
+                        ? "bg-gray-800 divide-gray-700"
+                        : "bg-white divide-gray-200"
+                    }`}
+                  >
+                    {classReport.students.map((student) => (
+                      <tr key={student.studentId}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`text-sm ${
+                              isDark ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {student.rollNumber}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`text-sm font-medium ${
+                              isDark ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {student.fullName}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span
+                            className={`text-sm ${
+                              isDark ? "text-gray-300" : "text-gray-700"
+                            }`}
+                          >
+                            {student.total}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-sm text-green-600 font-semibold">
+                            {student.present}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-sm text-red-600 font-semibold">
+                            {student.absent}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-sm text-yellow-600 font-semibold">
+                            {student.late}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                              student.percentage >= 75
+                                ? "bg-green-100 text-green-700"
+                                : student.percentage >= 60
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {student.percentage}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </form>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

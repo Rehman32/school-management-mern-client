@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { listExams, createExam, addGrade } from '../../api/examApi';
-import { listSubjects } from '../../api/subjectApi';
+import { listClasses } from "../../api/classApi";
+import { listSubjects } from "../../api/subjectApi";
 import { listStudents } from '../../api/studentApi';
 import GradeEntry from '../../components/admin/GradeEntry';
 import { toast } from 'react-hot-toast';
@@ -19,6 +20,7 @@ import {
 
 export default function AcademicsManagement() {
   const [exams, setExams] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [students, setStudents] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -30,39 +32,40 @@ export default function AcademicsManagement() {
   // Get theme from context - same as AdminDashboard
   const { isDark } = useTheme();
 
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
   const fetchAll = async () => {
     try {
       const ex = await listExams();
       setExams(ex || []);
+      const cl = await listClasses();
+      setClasses(cl.data || cl || []);
       const sub = await listSubjects();
-      setSubjects(sub || []);
+      setSubjects(sub.data || sub || []);
       const st = await listStudents();
-      setStudents(st || []);
+      setStudents(st.data || st || []);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load data');
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
-
   const handleCreateExam = async (e) => {
     e.preventDefault();
     const form = new FormData(e.target);
-    try {
-      await createExam({
-        title: form.get('title'),
-        classId: form.get('classId'),
-        date: form.get('date'),
-        totalMarks: Number(form.get('totalMarks')),
-      });
-      toast.success('Exam created successfully');
-      setShowCreate(false);
-      fetchAll();
-      e.target.reset();
-    } catch (err) { 
-      toast.error('Failed to create exam'); 
-    }
+    await createExam({
+      title: form.get('title'),
+      classId: form.get('classId'), // this is the ObjectId string
+      subjectId: form.get('subjectId'), // this is the ObjectId string
+      date: form.get('date'),
+      totalMarks: Number(form.get('totalMarks')),
+    });
+    toast.success('Exam created successfully');
+    setShowCreate(false);
+    fetchAll();
+    e.target.reset();
   };
 
   const handleSaveGrades = async () => {
@@ -333,15 +336,41 @@ export default function AcademicsManagement() {
                     }`}>
                       Class ID
                     </label>
-                    <input
-                      name="classId"
-                      placeholder="e.g., CS-101"
+                    <select name="classId" required
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 outline-none ${
                         isDark 
                           ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-500' 
                           : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400'
                       }`}
-                    />
+                    >
+                      <option value="">Select Class</option>
+                      {classes.map(cls => (
+                        <option key={cls._id} value={cls._id}>
+                          {cls.name} ({cls.grade}{cls.section ? `-${cls.section}` : ""})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      Subject ID
+                    </label>
+                    <select name="subjectId" required
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 outline-none ${
+                        isDark 
+                          ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-500' 
+                          : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400'
+                      }`}
+                    >
+                      <option value="">Select Subject</option>
+                      {subjects.map(sub => (
+                        <option key={sub._id} value={sub._id}>
+                          {sub.name} ({sub.code})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end">

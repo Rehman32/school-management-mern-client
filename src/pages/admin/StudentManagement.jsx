@@ -1,236 +1,459 @@
-import React, { useState, useEffect } from "react";
-import {
-  Users,
-  Plus,
-  Search,
-  Filter,
-  Edit,
-  Trash2,
-  Eye,
-  Download,
-  Upload,
-  UserPlus,
-  Mail,
-  Phone,
-  Calendar,
-  MapPin,
-  User,
-  BookOpen,
-  X,
-  Check,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-  FileText,
-  UserCheck,
-} from "lucide-react";
+// studentManagement.jsx
+import React, { useEffect, useState } from "react";
 import {
   getAllStudents,
   createStudent,
   updateStudent,
   deleteStudent,
+  getStatistics,
+  bulkDelete,
 } from "../../api/studentApi";
+import { listClasses } from "../../api/classApi";
+import { toast } from "react-hot-toast";
+import * as XLSX from "xlsx";
+import {
+  FaUserGraduate,
+  FaPlus,
+  FaTimes,
+  FaEdit,
+  FaTrash,
+  FaSave,
+  FaSearch,
+  FaFilter,
+  FaDownload,
+  FaChartBar,
+  FaUsers,
+  FaMale,
+  FaFemale,
+  FaPhone,
+  FaEnvelope,
+  FaCalendarAlt,
+  FaMapMarkerAlt,
+  FaUserShield,
+  FaCheckCircle,
+  FaTimesCircle,
+} from "react-icons/fa";
+import { useAuth } from "../../context/AuthContext";
 
-const StudentManagement = ({ isDark }) => {
-  // Remove mockStudents and use API data
+// Blood group options
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+// Status options
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active", color: "green" },
+  { value: "inactive", label: "Inactive", color: "gray" },
+  { value: "graduated", label: "Graduated", color: "blue" },
+  { value: "transferred", label: "Transferred", color: "yellow" },
+  { value: "expelled", label: "Expelled", color: "red" },
+  { value: "suspended", label: "Suspended", color: "orange" },
+];
+
+export default function StudentManagement({ isDark }) {
+  const { role } = useAuth();
   const [students, setStudents] = useState([]);
-  const [filteredStudents, setFilteredStudents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedGender, setSelectedGender] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [studentsPerPage] = useState(10);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  // Form state
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    rollNumber: "",
-    className: "",
-    phone: "",
-    gender: "",
-    dob: "",
-    address: "", // <-- use 'address'
-    guardianName: "",
-    guardianPhoneNumber: "",
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterClass, setFilterClass] = useState("");
+  const [filterStatus, setFilterStatus] = useState("active");
+  const [filterGender, setFilterGender] = useState("");
+  const [statistics, setStatistics] = useState(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 0,
   });
 
-  // Fetch students from API
+  // Form state
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    rollNumber: "",
+    admissionNumber: "", // ✅ ADD THIS
+    class: "",
+    gender: "male",
+    dob: "",
+    bloodGroup: "",
+    nationality: "Indian",
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      pincode: "",
+      country: "India",
+    },
+    guardians: [
+      {
+        name: "",
+        relationship: "father",
+        phone: "",
+        email: "",
+        occupation: "",
+        isPrimary: true,
+      },
+    ],
+    emergencyContacts: [],
+    medicalConditions: "",
+    allergies: "",
+    transportRequired: false,
+    busRoute: "",
+    hostelRequired: false,
+    status: "active",
+  });
+  // Fetch classes
+  useEffect(() => {
+    fetchClasses();
+  }, []);
+
+  // Fetch students
   useEffect(() => {
     fetchStudents();
-  }, []);
+  }, [pagination.page, filterClass, filterStatus, filterGender, searchTerm]);
+
+  const fetchClasses = async () => {
+    try {
+      const res = await listClasses();
+      const data = res.data.data || res;
+      setClasses(data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load classes");
+    }
+  };
 
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await getAllStudents();
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm,
+        status: filterStatus,
+      };
 
-      setStudents(res.data.data || []);
-    } catch (err) {
-      setError("Failed to fetch students.");
-    }
-    setLoading(false);
-  };
+      if (filterClass) params.class = filterClass;
+      if (filterGender) params.gender = filterGender;
 
-  // Filter and search logic
-  useEffect(() => {
-    let filtered = students;
+      const res = await getAllStudents(params);
+      const data = res.data || res;
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (student) =>
-          student.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          student.rollNumber.toString().includes(searchTerm)
-      );
-    }
-
-    if (selectedClass) {
-      filtered = filtered.filter(
-        (student) => student.className === selectedClass
-      );
-    }
-
-    if (selectedGender) {
-      filtered = filtered.filter(
-        (student) => student.gender === selectedGender
-      );
-    }
-
-    setFilteredStudents(filtered);
-    setCurrentPage(1);
-  }, [searchTerm, selectedClass, selectedGender, students]);
-
-  // Pagination logic
-  const indexOfLastStudent = currentPage * studentsPerPage;
-  const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
-  const currentStudents = filteredStudents.slice(
-    indexOfFirstStudent,
-    indexOfLastStudent
-  );
-  const totalPages = Math.ceil(filteredStudents.length / studentsPerPage);
-
-  // Get unique classes and genders for filters
-  const uniqueClasses = [
-    ...new Set(students.map((student) => student.className)),
-  ];
-  const uniqueGenders = [...new Set(students.map((student) => student.gender))];
-
-  // Form handlers
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const resetForm = () => {
-    setFormData({
-      fullName: "",
-      email: "",
-      rollNumber: "",
-      className: "",
-      phone: "",
-      gender: "",
-      dob: "",
-      address: "",
-      guardianName: "",
-      guardianPhoneNumber: "",
-    });
-  };
-
-  // CREATE
-  const handleAddStudent = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await createStudent(formData);
-      setStudents([res.data, ...students]);
-      setSuccess("Student added successfully!");
-      setShowAddModal(false);
-      resetForm();
-    } catch (err) {
-      setError("Failed to add student. Please try again.");
-    }
-
-    setLoading(false);
-  };
-
-  // UPDATE
-  const handleEditStudent = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await updateStudent(selectedStudent._id, formData);
-      const updatedStudents = students.map((student) =>
-        student._id === selectedStudent._id ? res.data : student
-      );
-      setStudents(updatedStudents);
-      setSuccess("Student updated successfully!");
-      setShowEditModal(false);
-      setSelectedStudent(null);
-      resetForm();
-    } catch (err) {
-      setError("Failed to update student. Please try again.");
-    }
-    setLoading(false);
-  };
-
-  // DELETE
-  const handleDeleteStudent = async (studentId) => {
-    if (window.confirm("Are you sure you want to delete this student?")) {
-      setLoading(true);
-      try {
-        await deleteStudent(studentId);
-        setStudents(students.filter((student) => student._id !== studentId));
-        setSuccess("Student deleted successfully!");
-      } catch (err) {
-        setError("Failed to delete student. Please try again.");
+      setStudents(data.data || []);
+      if (data.pagination) {
+        setPagination(data.pagination);
       }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load students");
+    } finally {
       setLoading(false);
     }
   };
 
-  const openEditModal = (student) => {
-    setSelectedStudent(student);
-    setFormData({
-      fullName: student.fullName,
-      email: student.email,
-      rollNumber: student.rollNumber,
-      className: student.className,
-      phone: student.phone,
-      gender: student.gender,
-      dob: student.dob,
-      address: student.address,
-      guardianName: student.guardianName,
-      guardianPhoneNumber: student.guardianPhoneNumber,
-    });
-    setShowEditModal(true);
-  };
-
-  const openViewModal = (student) => {
-    setSelectedStudent(student);
-    setShowViewModal(true);
-  };
-
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    if (success || error) {
-      const timer = setTimeout(() => {
-        setSuccess("");
-        setError("");
-      }, 5000);
-      return () => clearTimeout(timer);
+  const fetchStatistics = async () => {
+    try {
+      const res = await getStatistics();
+      setStatistics(res.data.data);
+      setShowStatsModal(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load statistics");
     }
-  }, [success, error]);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validation
+    if (!form.fullName || !form.class || !form.gender || !form.dob) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
+    if (
+      !form.guardians ||
+      form.guardians.length === 0 ||
+      !form.guardians[0].name
+    ) {
+      toast.error("At least one guardian is required");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (editingId) {
+        await updateStudent(editingId, form);
+        toast.success("Student updated successfully");
+      } else {
+        await createStudent(form);
+        toast.success("Student created successfully");
+      }
+
+      setShowModal(false);
+      resetForm();
+      fetchStudents();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Operation failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (student) => {
+    setEditingId(student._id);
+    setForm({
+      fullName: student.fullName || "",
+      email: student.email || "",
+      phone: student.phone || "",
+      rollNumber: student.rollNumber || "",
+      admissionNumber: student.admissionNumber || "",
+      class: student.class?._id || student.class || "",
+      gender: student.gender || "male",
+      dob: student.dob ? new Date(student.dob).toISOString().split("T")[0] : "",
+      bloodGroup: student.bloodGroup || "",
+      nationality: student.nationality || "Indian",
+      address: student.address || {
+        street: "",
+        city: "",
+        state: "",
+        pincode: "",
+        country: "India",
+      },
+      guardians:
+        student.guardians && student.guardians.length > 0
+          ? student.guardians
+          : [
+              {
+                name: "",
+                relationship: "father",
+                phone: "",
+                email: "",
+                occupation: "",
+                isPrimary: true,
+              },
+            ],
+      emergencyContacts: student.emergencyContacts || [],
+      medicalConditions: student.medicalConditions || "",
+      allergies: student.allergies || "",
+      transportRequired: student.transportRequired || false,
+      busRoute: student.busRoute || "",
+      hostelRequired: student.hostelRequired || false,
+      status: student.status || "active",
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this student?"))
+      return;
+
+    try {
+      await deleteStudent(id);
+      toast.success("Student deleted successfully");
+      fetchStudents();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to delete student");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedStudents.length === 0) {
+      toast.error("No students selected");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${selectedStudents.length} student(s)?`
+      )
+    )
+      return;
+
+    try {
+      await bulkDelete(selectedStudents);
+      toast.success(`${selectedStudents.length} students deleted successfully`);
+      setSelectedStudents([]);
+      fetchStudents();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete students");
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      const exportData = students.map((student) => ({
+        "Admission No": student.admissionNumber,
+        "Roll No": student.rollNumber,
+        Name: student.fullName,
+        Class: student.class?.name || "N/A",
+        Gender: student.gender,
+        "Date of Birth": student.dob
+          ? new Date(student.dob).toLocaleDateString()
+          : "N/A",
+        Email: student.email || "N/A",
+        Phone: student.phone || "N/A",
+        "Guardian Name": student.guardians?.[0]?.name || "N/A",
+        "Guardian Phone": student.guardians?.[0]?.phone || "N/A",
+        Status: student.status,
+        "Enrolled Date": new Date(student.enrolledDate).toLocaleDateString(),
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 10 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 12 },
+        { wch: 15 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Students");
+
+      const filename = `Students_${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
+      XLSX.writeFile(wb, filename);
+
+      toast.success("Excel file exported successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export");
+    }
+  };
+
+  const resetForm = () => {
+  setEditingId(null);
+  setForm({
+    fullName: "",
+    email: "",
+    phone: "",
+    rollNumber: "",
+    admissionNumber: "", // ✅ ADD THIS
+    class: "",
+    gender: "male",
+    dob: "",
+    bloodGroup: "",
+    nationality: "Indian",
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      pincode: "",
+      country: "India",
+    },
+    guardians: [
+      {
+        name: "",
+        relationship: "father",
+        phone: "",
+        email: "",
+        occupation: "",
+        isPrimary: true,
+      },
+    ],
+    emergencyContacts: [],
+    medicalConditions: "",
+    allergies: "",
+    transportRequired: false,
+    busRoute: "",
+    hostelRequired: false,
+    status: "active",
+  });
+};
+
+  const addGuardian = () => {
+    setForm({
+      ...form,
+      guardians: [
+        ...form.guardians,
+        {
+          name: "",
+          relationship: "guardian",
+          phone: "",
+          email: "",
+          occupation: "",
+          isPrimary: false,
+        },
+      ],
+    });
+  };
+
+  const removeGuardian = (index) => {
+    const newGuardians = form.guardians.filter((_, i) => i !== index);
+    setForm({ ...form, guardians: newGuardians });
+  };
+
+  const updateGuardian = (index, field, value) => {
+    const newGuardians = [...form.guardians];
+    newGuardians[index][field] = value;
+    setForm({ ...form, guardians: newGuardians });
+  };
+
+  const toggleSelectStudent = (id) => {
+    setSelectedStudents((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudents.length === students.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(students.map((s) => s._id));
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig =
+      STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
+    const colorClasses = {
+      green: isDark
+        ? "bg-green-900/30 text-green-400 border-green-800"
+        : "bg-green-100 text-green-700 border-green-200",
+      gray: isDark
+        ? "bg-gray-900/30 text-gray-400 border-gray-800"
+        : "bg-gray-100 text-gray-700 border-gray-200",
+      blue: isDark
+        ? "bg-blue-900/30 text-blue-400 border-blue-800"
+        : "bg-blue-100 text-blue-700 border-blue-200",
+      yellow: isDark
+        ? "bg-yellow-900/30 text-yellow-400 border-yellow-800"
+        : "bg-yellow-100 text-yellow-700 border-yellow-200",
+      red: isDark
+        ? "bg-red-900/30 text-red-400 border-red-800"
+        : "bg-red-100 text-red-700 border-red-200",
+      orange: isDark
+        ? "bg-orange-900/30 text-orange-400 border-orange-800"
+        : "bg-orange-100 text-orange-700 border-orange-200",
+    };
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full border ${
+          colorClasses[statusConfig.color]
+        }`}
+      >
+        {statusConfig.label}
+      </span>
+    );
+  };
 
   return (
     <div
@@ -238,1288 +461,1364 @@ const StudentManagement = ({ isDark }) => {
         isDark ? "bg-gray-900" : "bg-gray-50"
       }`}
     >
-      {/* Header Section */}
+      {/* Header */}
       <div
-        className={`${
+        className={`border-b shadow-sm ${
           isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-        } border-b p-6`}
+        }`}
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div className="mb-4 md:mb-0">
-            <h1
-              className={`text-3xl font-bold ${
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-lg">
+                <FaUserGraduate className="text-white text-2xl" />
+              </div>
+              <div>
+                <h1
+                  className={`text-3xl font-bold ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Student Management
+                </h1>
+                <p
+                  className={`mt-1 text-sm ${
+                    isDark ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Manage student information and records
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 flex-wrap">
+              {selectedStudents.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium shadow-md transition-all"
+                >
+                  <FaTrash />
+                  Delete ({selectedStudents.length})
+                </button>
+              )}
+              <button
+                onClick={fetchStatistics}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-md transition-all"
+              >
+                <FaChartBar />
+                Statistics
+              </button>
+              <button
+                onClick={handleExportExcel}
+                disabled={students.length === 0}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium shadow-md transition-all ${
+                  students.length === 0
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-green-600 hover:bg-green-700 text-white"
+                }`}
+              >
+                <FaDownload />
+                Export
+              </button>
+              <button
+                onClick={() => {
+                  resetForm();
+                  setShowModal(true);
+                }}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-md transition-all"
+              >
+                <FaPlus />
+                Add Student
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* Filters */}
+        <div
+          className={`mb-6 p-6 rounded-2xl border shadow-md ${
+            isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <FaFilter className={isDark ? "text-gray-400" : "text-gray-600"} />
+            <h3
+              className={`text-lg font-semibold ${
                 isDark ? "text-white" : "text-gray-900"
               }`}
             >
-              Student Management
-            </h1>
-            <p className={`mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-              Manage student records, enrollment, and information
-            </p>
+              Filters
+            </h3>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => {
-                resetForm();
-                setShowAddModal(true);
-              }}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium cursor-pointer"
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <FaSearch
+                className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                  isDark ? "text-gray-500" : "text-gray-400"
+                }`}
+              />
+              <input
+                type="text"
+                placeholder="Search students..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                  isDark
+                    ? "border-gray-600 bg-gray-700 text-white placeholder-gray-500"
+                    : "border-gray-300 bg-white text-gray-900 placeholder-gray-400"
+                }`}
+              />
+            </div>
+
+            {/* Class Filter */}
+            <select
+              value={filterClass}
+              onChange={(e) => setFilterClass(e.target.value)}
+              className={`px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                isDark
+                  ? "border-gray-600 bg-gray-700 text-white"
+                  : "border-gray-300 bg-white text-gray-900"
+              }`}
             >
-              <Plus size={20} />
-              Add Student
-            </button>
-            <button className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 font-medium">
-              <Upload size={20} />
-              Import
-            </button>
-            <button className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-200 font-medium">
-              <Download size={20} />
-              Export
-            </button>
+              <option value="">All Classes</option>
+              {classes.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name || `${cls.grade} - ${cls.section}`}
+                </option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className={`px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                isDark
+                  ? "border-gray-600 bg-gray-700 text-white"
+                  : "border-gray-300 bg-white text-gray-900"
+              }`}
+            >
+              <option value="">All Status</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Gender Filter */}
+            <select
+              value={filterGender}
+              onChange={(e) => setFilterGender(e.target.value)}
+              className={`px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                isDark
+                  ? "border-gray-600 bg-gray-700 text-white"
+                  : "border-gray-300 bg-white text-gray-900"
+              }`}
+            >
+              <option value="">All Genders</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
           </div>
         </div>
-      </div>
 
-      {/* Success/Error Messages */}
-      {(success || error) && (
+        {/* Student Table */}
         <div
-          className={`mx-6 mt-4 p-4 rounded-xl ${
-            success
-              ? "bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700"
-              : "bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-700"
+          className={`rounded-2xl border shadow-md overflow-hidden ${
+            isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
           }`}
         >
-          <div className="flex items-center">
-            {success ? (
-              <Check className="h-5 w-5 text-green-500 mr-2" />
-            ) : (
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-            )}
-            <span
-              className={`${
-                success
-                  ? "text-green-700 dark:text-green-400"
-                  : "text-red-700 dark:text-red-400"
-              }`}
-            >
-              {success || error}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Filters and Search */}
-      <div
-        className={`mx-6 mt-6 p-6 rounded-2xl shadow-sm ${
-          isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-        } border`}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search
-              className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${
-                isDark ? "text-gray-400" : "text-gray-400"
-              }`}
-            />
-            <input
-              type="text"
-              placeholder="Search students..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 rounded-xl border transition-colors ${
-                isDark
-                  ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-                  : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"
-              } focus:ring-2 focus:border-transparent`}
-            />
-          </div>
-
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className={`px-4 py-2 rounded-lg border cursor-pointer ${
-              isDark
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-gray-50 border-gray-300 text-gray-900"
+          <div
+            className={`p-6 border-b ${
+              isDark ? "border-gray-700" : "border-gray-200"
             }`}
           >
-            <option value="">All Classes</option>
-            {uniqueClasses.map((className) => (
-              <option key={className} value={className}>
-                {className}
-              </option>
-            ))}
-          </select>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3
+                  className={`text-lg font-semibold ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Students ({pagination.total})
+                </h3>
+                <p
+                  className={`text-sm mt-1 ${
+                    isDark ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
+                  Page {pagination.page} of {pagination.pages}
+                </p>
+              </div>
 
-          <select
-            value={selectedGender}
-            onChange={(e) => setSelectedGender(e.target.value)}
-            className={`px-4 py-2 rounded-lg border cursor-pointer ${
-              isDark
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-gray-50 border-gray-300 text-gray-900"
-            }`}
-          >
-            <option value="">All Genders</option>
-            {uniqueGenders.map((gender) => (
-              <option key={gender} value={gender}>
-                {gender}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setSearchTerm("");
-                setSelectedClass("");
-                setSelectedGender("");
-              }}
-              className={`px-4 py-2 rounded-lg border cursor-pointer ${
-                isDark
-                  ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Clear
-            </button>
+              {students.length > 0 && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.length === students.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span
+                    className={`text-sm ${
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    }`}
+                  >
+                    Select All
+                  </span>
+                </label>
+              )}
+            </div>
           </div>
+
+          {loading ? (
+            <div className="p-16 text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+              <p
+                className={`mt-4 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+              >
+                Loading students...
+              </p>
+            </div>
+          ) : students.length === 0 ? (
+            <div className="p-16 text-center">
+              <FaUserGraduate
+                className={`mx-auto text-5xl mb-4 ${
+                  isDark ? "text-gray-600" : "text-gray-400"
+                }`}
+              />
+              <h3
+                className={`text-lg font-medium mb-2 ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              >
+                No students found
+              </h3>
+              <p
+                className={`mb-6 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+              >
+                {searchTerm || filterClass || filterStatus !== "active"
+                  ? "Try adjusting your filters"
+                  : "Add your first student to get started"}
+              </p>
+              {!searchTerm && !filterClass && filterStatus === "active" && (
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-xl shadow-md transition-all"
+                >
+                  <FaPlus />
+                  Add Student
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table
+                  className={`min-w-full divide-y ${
+                    isDark ? "divide-gray-700" : "divide-gray-200"
+                  }`}
+                >
+                  <thead className={isDark ? "bg-gray-900/50" : "bg-gray-50"}>
+                    <tr>
+                      <th className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.length === students.length}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                      </th>
+                      <th
+                        className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Student
+                      </th>
+                      <th
+                        className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Class
+                      </th>
+                      <th
+                        className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Contact
+                      </th>
+                      <th
+                        className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Guardian
+                      </th>
+                      <th
+                        className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Status
+                      </th>
+                      <th
+                        className={`px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    className={`divide-y ${
+                      isDark
+                        ? "bg-gray-800 divide-gray-700"
+                        : "bg-white divide-gray-200"
+                    }`}
+                  >
+                    {students.map((student) => (
+                      <tr
+                        key={student._id}
+                        className={`transition-colors ${
+                          isDark ? "hover:bg-gray-700/50" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudents.includes(student._id)}
+                            onChange={() => toggleSelectStudent(student._id)}
+                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                                student.gender === "male"
+                                  ? isDark
+                                    ? "bg-blue-900/30 text-blue-400"
+                                    : "bg-blue-100 text-blue-700"
+                                  : isDark
+                                  ? "bg-pink-900/30 text-pink-400"
+                                  : "bg-pink-100 text-pink-700"
+                              }`}
+                            >
+                              {student.gender === "male" ? (
+                                <FaMale />
+                              ) : (
+                                <FaFemale />
+                              )}
+                            </div>
+                            <div>
+                              <div
+                                className={`text-sm font-medium ${
+                                  isDark ? "text-white" : "text-gray-900"
+                                }`}
+                              >
+                                {student.fullName}
+                              </div>
+                              <div
+                                className={`text-xs ${
+                                  isDark ? "text-gray-400" : "text-gray-500"
+                                }`}
+                              >
+                                Roll: {student.rollNumber}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`text-sm ${
+                              isDark ? "text-gray-300" : "text-gray-700"
+                            }`}
+                          >
+                            {student.class?.name || "N/A"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            {student.email && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <FaEnvelope
+                                  className={
+                                    isDark ? "text-gray-500" : "text-gray-400"
+                                  }
+                                />
+                                <span
+                                  className={
+                                    isDark ? "text-gray-300" : "text-gray-700"
+                                  }
+                                >
+                                  {student.email}
+                                </span>
+                              </div>
+                            )}
+                            {student.phone && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <FaPhone
+                                  className={
+                                    isDark ? "text-gray-500" : "text-gray-400"
+                                  }
+                                />
+                                <span
+                                  className={
+                                    isDark ? "text-gray-300" : "text-gray-700"
+                                  }
+                                >
+                                  {student.phone}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {student.guardians &&
+                            student.guardians.length > 0 && (
+                              <div>
+                                <div
+                                  className={`text-sm ${
+                                    isDark ? "text-gray-300" : "text-gray-700"
+                                  }`}
+                                >
+                                  {student.guardians[0].name}
+                                </div>
+                                <div
+                                  className={`text-xs ${
+                                    isDark ? "text-gray-400" : "text-gray-500"
+                                  }`}
+                                >
+                                  {student.guardians[0].phone}
+                                </div>
+                              </div>
+                            )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(student.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="inline-flex gap-2">
+                            <button
+                              onClick={() => handleEdit(student)}
+                              className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                                isDark
+                                  ? "text-blue-400 hover:bg-blue-900/20"
+                                  : "text-blue-600 hover:bg-blue-50"
+                              }`}
+                            >
+                              <FaEdit />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(student._id)}
+                              className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                                isDark
+                                  ? "text-red-400 hover:bg-red-900/20"
+                                  : "text-red-600 hover:bg-red-50"
+                              }`}
+                            >
+                              <FaTrash />
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {pagination.pages > 1 && (
+                <div
+                  className={`px-6 py-4 border-t flex items-center justify-between ${
+                    isDark ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
+                  <button
+                    onClick={() =>
+                      setPagination({
+                        ...pagination,
+                        page: pagination.page - 1,
+                      })
+                    }
+                    disabled={pagination.page === 1}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      pagination.page === 1
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-700"
+                    } ${isDark ? "text-white" : "text-gray-900"}`}
+                  >
+                    Previous
+                  </button>
+                  <span className={isDark ? "text-gray-300" : "text-gray-700"}>
+                    Page {pagination.page} of {pagination.pages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setPagination({
+                        ...pagination,
+                        page: pagination.page + 1,
+                      })
+                    }
+                    disabled={pagination.page === pagination.pages}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      pagination.page === pagination.pages
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-700"
+                    } ${isDark ? "text-white" : "text-gray-900"}`}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      {/* Students Table */}
-      <div
-        className={`mx-6 mt-6 rounded-2xl shadow-sm overflow-hidden ${
-          isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-        } border`}
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className={`${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
-              <tr>
-                <th
-                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDark ? "text-gray-300" : "text-gray-500"
-                  }`}
-                >
-                  Student
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDark ? "text-gray-300" : "text-gray-500"
-                  }`}
-                >
-                  Roll Number
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDark ? "text-gray-300" : "text-gray-500"
-                  }`}
-                >
-                  Class
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDark ? "text-gray-300" : "text-gray-500"
-                  }`}
-                >
-                  Contact
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDark ? "text-gray-300" : "text-gray-500"
-                  }`}
-                >
-                  Enrolled
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDark ? "text-gray-300" : "text-gray-500"
-                  }`}
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody
-              className={`divide-y ${
-                isDark ? "divide-gray-700" : "divide-gray-200"
+      {/* Add/Edit Student Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto">
+          <div
+            className={`rounded-2xl max-w-4xl w-full my-8 shadow-2xl border ${
+              isDark
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
+            {/* Modal Header */}
+            <div
+              className={`p-6 border-b sticky top-0 z-10 ${
+                isDark
+                  ? "border-gray-700 bg-gradient-to-r from-purple-900/20 to-pink-900/20"
+                  : "border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50"
               }`}
             >
-              {currentStudents.map((student) => (
-                <tr
-                  key={student._id}
-                  className={`transition-colors ${
-                    isDark ? "hover:bg-gray-700" : "hover:bg-gray-50"
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl">
+                    <FaUserGraduate className="text-white text-xl" />
+                  </div>
+                  <div>
+                    <h3
+                      className={`text-xl font-bold ${
+                        isDark ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {editingId ? "Edit Student" : "Add New Student"}
+                    </h3>
+                    <p
+                      className={`text-sm mt-0.5 ${
+                        isDark ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      Fill in the student information
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isDark
+                      ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div
-                        className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
-                          isDark ? "bg-gray-700" : "bg-gray-100"
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <form
+              onSubmit={handleSubmit}
+              className="p-6 space-y-6 max-h-[70vh] overflow-y-auto"
+            >
+              {/* Basic Information */}
+              <div>
+                <h4
+                  className={`text-lg font-semibold mb-4 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Basic Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.fullName}
+                      onChange={(e) =>
+                        setForm({ ...form, fullName: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Gender *
+                    </label>
+                    <select
+                      required
+                      value={form.gender}
+                      onChange={(e) =>
+                        setForm({ ...form, gender: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Date of Birth *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={form.dob}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) =>
+                        setForm({ ...form, dob: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Blood Group
+                    </label>
+                    <select
+                      value={form.bloodGroup}
+                      onChange={(e) =>
+                        setForm({ ...form, bloodGroup: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    >
+                      <option value="">Select Blood Group</option>
+                      {BLOOD_GROUPS.map((bg) => (
+                        <option key={bg} value={bg}>
+                          {bg}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Academic Information */}
+              <div>
+                <h4
+                  className={`text-lg font-semibold mb-4 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Academic Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Admission Number
+                      <span className="text-xs text-gray-500 ml-2">
+                        (Auto-generated)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={form.admissionNumber || ""}
+                      onChange={(e) =>
+                        setForm({ ...form, admissionNumber: e.target.value })
+                      }
+                      placeholder="Will be auto-generated if empty"
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white placeholder-gray-500"
+                          : "border-gray-300 bg-white text-gray-900 placeholder-gray-400"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Class *
+                    </label>
+                    <select
+                      required
+                      value={form.class}
+                      onChange={(e) =>
+                        setForm({ ...form, class: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    >
+                      <option value="">Select Class</option>
+                      {classes.map((cls) => (
+                        <option key={cls._id} value={cls._id}>
+                          {cls.name || `${cls.grade} - ${cls.section}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Roll Number *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.rollNumber}
+                      onChange={(e) =>
+                        setForm({ ...form, rollNumber: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Status
+                    </label>
+                    <select
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm({ ...form, status: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    >
+                      {STATUS_OPTIONS.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h4
+                  className={`text-lg font-semibold mb-4 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Contact Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) =>
+                        setForm({ ...form, email: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={form.phone}
+                      onChange={(e) =>
+                        setForm({ ...form, phone: e.target.value })
+                      }
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Guardian Information */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h4
+                    className={`text-lg font-semibold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Guardian Information *
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={addGuardian}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-all"
+                  >
+                    <FaPlus />
+                    Add Guardian
+                  </button>
+                </div>
+
+                {form.guardians.map((guardian, index) => (
+                  <div
+                    key={index}
+                    className={`mb-4 p-4 rounded-xl border ${
+                      isDark
+                        ? "border-gray-600 bg-gray-700/50"
+                        : "border-gray-300 bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <h5
+                        className={`font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
                         }`}
                       >
-                        <User
-                          className={`h-5 w-5 ${
-                            isDark ? "text-gray-400" : "text-gray-500"
+                        Guardian {index + 1}
+                      </h5>
+                      {form.guardians.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeGuardian(index)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <FaTimes />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-2 ${
+                            isDark ? "text-gray-300" : "text-gray-700"
+                          }`}
+                        >
+                          Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={guardian.name}
+                          onChange={(e) =>
+                            updateGuardian(index, "name", e.target.value)
+                          }
+                          className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                            isDark
+                              ? "border-gray-600 bg-gray-700 text-white"
+                              : "border-gray-300 bg-white text-gray-900"
                           }`}
                         />
                       </div>
-                      <div className="ml-4">
-                        <div
-                          className={`text-sm font-medium ${
-                            isDark ? "text-white" : "text-gray-900"
+
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-2 ${
+                            isDark ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          {student.fullName}
-                        </div>
-                        <div
-                          className={`text-sm ${
-                            isDark ? "text-gray-400" : "text-gray-500"
+                          Relationship *
+                        </label>
+                        <select
+                          required
+                          value={guardian.relationship}
+                          onChange={(e) =>
+                            updateGuardian(
+                              index,
+                              "relationship",
+                              e.target.value
+                            )
+                          }
+                          className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                            isDark
+                              ? "border-gray-600 bg-gray-700 text-white"
+                              : "border-gray-300 bg-white text-gray-900"
                           }`}
                         >
-                          {student.email}
-                        </div>
+                          <option value="father">Father</option>
+                          <option value="mother">Mother</option>
+                          <option value="guardian">Guardian</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-2 ${
+                            isDark ? "text-gray-300" : "text-gray-700"
+                          }`}
+                        >
+                          Phone *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={guardian.phone}
+                          onChange={(e) =>
+                            updateGuardian(index, "phone", e.target.value)
+                          }
+                          className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                            isDark
+                              ? "border-gray-600 bg-gray-700 text-white"
+                              : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-2 ${
+                            isDark ? "text-gray-300" : "text-gray-700"
+                          }`}
+                        >
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={guardian.email}
+                          onChange={(e) =>
+                            updateGuardian(index, "email", e.target.value)
+                          }
+                          className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                            isDark
+                              ? "border-gray-600 bg-gray-700 text-white"
+                              : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          className={`block text-sm font-medium mb-2 ${
+                            isDark ? "text-gray-300" : "text-gray-700"
+                          }`}
+                        >
+                          Occupation
+                        </label>
+                        <input
+                          type="text"
+                          value={guardian.occupation}
+                          onChange={(e) =>
+                            updateGuardian(index, "occupation", e.target.value)
+                          }
+                          className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                            isDark
+                              ? "border-gray-600 bg-gray-700 text-white"
+                              : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                        />
                       </div>
                     </div>
-                  </td>
-                  <td
-                    className={`px-6 py-4 whitespace-nowrap text-sm ${
-                      isDark ? "text-gray-300" : "text-gray-900"
-                    }`}
-                  >
-                    {student.rollNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        isDark
-                          ? "bg-blue-900/30 text-blue-400"
-                          : "bg-blue-100 text-blue-800"
+                  </div>
+                ))}
+              </div>
+
+              {/* Medical Information */}
+              <div>
+                <h4
+                  className={`text-lg font-semibold mb-4 ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Medical Information
+                </h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
                       }`}
                     >
-                      {student.className}
-                    </span>
-                  </td>
-                  <td
-                    className={`px-6 py-4 whitespace-nowrap text-sm ${
-                      isDark ? "text-gray-300" : "text-gray-500"
-                    }`}
-                  >
-                    <div>{student.phone}</div>
-                    <div className="text-xs">{student.gender}</div>
-                  </td>
-                  <td
-                    className={`px-6 py-4 whitespace-nowrap text-sm ${
-                      isDark ? "text-gray-300" : "text-gray-500"
-                    }`}
-                  >
-                    {new Date(student.enrolledDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => openViewModal(student)}
-                        className={`p-2 rounded-lg cursor-pointer transition-colors ${
-                          isDark
-                            ? "text-gray-400 hover:text-blue-400 hover:bg-blue-900/20"
-                            : "text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-                        }`}
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => openEditModal(student)}
-                        className={`p-2 rounded-lg cursor-pointer transition-colors ${
-                          isDark
-                            ? "text-gray-400 hover:text-green-400 hover:bg-green-900/20"
-                            : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                        }`}
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteStudent(student._id)}
-                        className={`p-2 rounded-lg cursor-pointer transition-colors ${
-                          isDark
-                            ? "text-gray-400 hover:text-red-400 hover:bg-red-900/20"
-                            : "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                        }`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      Medical Conditions
+                    </label>
+                    <textarea
+                      value={form.medicalConditions}
+                      onChange={(e) =>
+                        setForm({ ...form, medicalConditions: e.target.value })
+                      }
+                      rows={2}
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+                  <div>
+                    <label
+                      className={`block text-sm font-medium mb-2 ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      Allergies
+                    </label>
+                    <textarea
+                      value={form.allergies}
+                      onChange={(e) =>
+                        setForm({ ...form, allergies: e.target.value })
+                      }
+                      rows={2}
+                      className={`w-full px-4 py-2.5 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-purple-500 ${
+                        isDark
+                          ? "border-gray-600 bg-gray-700 text-white"
+                          : "border-gray-300 bg-white text-gray-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div
+                className={`flex justify-end gap-3 pt-4 border-t ${
+                  isDark ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className={`px-6 py-2.5 rounded-xl border font-medium transition-all ${
+                    isDark
+                      ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium shadow-md transition-all ${
+                    loading
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                  }`}
+                >
+                  <FaSave />
+                  {loading
+                    ? "Saving..."
+                    : editingId
+                    ? "Update Student"
+                    : "Create Student"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Statistics Modal */}
+      {showStatsModal && statistics && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div
-            className={`flex items-center justify-between px-6 py-3 border-t ${
+            className={`rounded-2xl max-w-4xl w-full shadow-2xl border ${
               isDark
-                ? "border-gray-700 bg-gray-800"
-                : "border-gray-200 bg-gray-50"
-            }`}
-          >
-            <div
-              className={`text-sm ${
-                isDark ? "text-gray-400" : "text-gray-700"
-              }`}
-            >
-              Showing {indexOfFirstStudent + 1} to{" "}
-              {Math.min(indexOfLastStudent, filteredStudents.length)} of{" "}
-              {filteredStudents.length} students
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className={`p-2 rounded-lg transition-colors ${
-                  currentPage === 1
-                    ? isDark
-                      ? "text-gray-600"
-                      : "text-gray-400"
-                    : isDark
-                    ? "text-gray-300 hover:bg-gray-700"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded-lg transition-colors ${
-                      currentPage === page
-                        ? "bg-blue-500 text-white"
-                        : isDark
-                        ? "text-gray-300 hover:bg-gray-700"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )
-              )}
-
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`p-2 rounded-lg transition-colors ${
-                  currentPage === totalPages
-                    ? isDark
-                      ? "text-gray-600"
-                      : "text-gray-400"
-                    : isDark
-                    ? "text-gray-300 hover:bg-gray-700"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Add Student Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div
-            className={`max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${
-              isDark ? "bg-gray-800" : "bg-white"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
             }`}
           >
             <div
               className={`p-6 border-b ${
-                isDark ? "border-gray-700" : "border-gray-200"
+                isDark
+                  ? "border-gray-700 bg-gradient-to-r from-purple-900/20 to-pink-900/20"
+                  : "border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Add New Student
-                </h2>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3
+                    className={`text-xl font-bold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Student Statistics
+                  </h3>
+                  <p
+                    className={`text-sm mt-1 ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Overview of student data
+                  </p>
+                </div>
                 <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    resetForm();
-                  }}
+                  onClick={() => setShowStatsModal(false)}
                   className={`p-2 rounded-lg transition-colors ${
                     isDark
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-500"
+                      ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleAddStudent} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Roll Number *
-                  </label>
-                  <input
-                    type="number"
-                    name="rollNumber"
-                    value={formData.rollNumber}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Class Name
-                  </label>
-                  <input
-                    type="text"
-                    name="className"
-                    value={formData.className}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Gender
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    name="dob"
-                    value={formData.dob}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Guardian Name
-                  </label>
-                  <input
-                    type="text"
-                    name="guardianName"
-                    value={formData.guardianName}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Guardian Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="guardianPhoneNumber"
-                    value={formData.guardianPhoneNumber}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Address
-                  </label>
-                  <textarea
-                    name="adress" // Corrected from 'address' to 'adress' to match schema
-                    value={formData.adress}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-8">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:opacity-50"
-                >
-                  {loading ? "Adding..." : "Add Student"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    resetForm();
-                  }}
-                  className={`px-6 py-3 rounded-xl border font-medium transition-colors ${
-                    isDark
-                      ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Student Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div
-            className={`max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${
-              isDark ? "bg-gray-800" : "bg-white"
-            }`}
-          >
-            <div
-              className={`p-6 border-b ${
-                isDark ? "border-gray-700" : "border-gray-200"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Edit Student
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedStudent(null);
-                    resetForm();
-                  }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isDark
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleEditStudent} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Roll Number *
-                  </label>
-                  <input
-                    type="number"
-                    name="rollNumber"
-                    value={formData.rollNumber}
-                    onChange={handleInputChange}
-                    required
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Class
-                  </label>
-                  <input
-                    type="text"
-                    name="className"
-                    value={formData.className}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 10-A"
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Gender
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    name="dob"
-                    value={formData.dob}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Guardian Name
-                  </label>
-                  <input
-                    type="text"
-                    name="guardianName"
-                    value={formData.guardianName}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Guardian Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="guardianPhoneNumber"
-                    value={formData.guardianPhoneNumber}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label
-                    className={`block text-sm font-medium mb-2 ${
-                      isDark ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    Address
-                  </label>
-                  <textarea
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    rows="3"
-                    className={`w-full px-3 py-2 rounded-xl border transition-colors ${
-                      isDark
-                        ? "bg-gray-700 border-gray-600 text-gray-200 focus:ring-blue-500 focus:border-blue-500"
-                        : "bg-gray-50 border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                    } focus:ring-2 focus:border-transparent`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-8">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-xl font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50"
-                >
-                  {loading ? "Updating..." : "Update Student"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedStudent(null);
-                    resetForm();
-                  }}
-                  className={`px-6 py-3 rounded-xl border font-medium transition-colors ${
-                    isDark
-                      ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* View Student Modal */}
-      {showViewModal && selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div
-            className={`max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${
-              isDark ? "bg-gray-800" : "bg-white"
-            }`}
-          >
-            <div
-              className={`p-6 border-b ${
-                isDark ? "border-gray-700" : "border-gray-200"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDark ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Student Details
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setSelectedStudent(null);
-                  }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isDark
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  <X size={20} />
+                  <FaTimes className="text-xl" />
                 </button>
               </div>
             </div>
 
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2 text-center mb-6">
-                  <div
-                    className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-4 ${
-                      isDark ? "bg-gray-700" : "bg-gray-100"
-                    }`}
-                  >
-                    <User
-                      className={`w-12 h-12 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
+              {/* Overall Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div
+                  className={`p-6 rounded-xl border ${
+                    isDark
+                      ? "bg-gray-700 border-gray-600"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div className="text-center">
+                    <FaUsers
+                      className={`mx-auto text-3xl mb-2 ${
+                        isDark ? "text-purple-400" : "text-purple-600"
                       }`}
                     />
+                    <div
+                      className={`text-3xl font-bold ${
+                        isDark ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {statistics.total}
+                    </div>
+                    <div
+                      className={`text-sm mt-1 ${
+                        isDark ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      Total Students
+                    </div>
                   </div>
-                  <h3
-                    className={`text-2xl font-bold ${
+                </div>
+
+                <div
+                  className={`p-6 rounded-xl border border-green-200 ${
+                    isDark ? "bg-green-900/20" : "bg-green-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <FaCheckCircle
+                      className={`mx-auto text-3xl mb-2 ${
+                        isDark ? "text-green-400" : "text-green-600"
+                      }`}
+                    />
+                    <div
+                      className={`text-3xl font-bold ${
+                        isDark ? "text-green-400" : "text-green-700"
+                      }`}
+                    >
+                      {statistics.active}
+                    </div>
+                    <div
+                      className={`text-sm mt-1 ${
+                        isDark ? "text-green-400" : "text-green-600"
+                      }`}
+                    >
+                      Active
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-6 rounded-xl border border-blue-200 ${
+                    isDark ? "bg-blue-900/20" : "bg-blue-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <FaMale
+                      className={`mx-auto text-3xl mb-2 ${
+                        isDark ? "text-blue-400" : "text-blue-600"
+                      }`}
+                    />
+                    <div
+                      className={`text-3xl font-bold ${
+                        isDark ? "text-blue-400" : "text-blue-700"
+                      }`}
+                    >
+                      {statistics.male}
+                    </div>
+                    <div
+                      className={`text-sm mt-1 ${
+                        isDark ? "text-blue-400" : "text-blue-600"
+                      }`}
+                    >
+                      Male
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-6 rounded-xl border border-pink-200 ${
+                    isDark ? "bg-pink-900/20" : "bg-pink-50"
+                  }`}
+                >
+                  <div className="text-center">
+                    <FaFemale
+                      className={`mx-auto text-3xl mb-2 ${
+                        isDark ? "text-pink-400" : "text-pink-600"
+                      }`}
+                    />
+                    <div
+                      className={`text-3xl font-bold ${
+                        isDark ? "text-pink-400" : "text-pink-700"
+                      }`}
+                    >
+                      {statistics.female}
+                    </div>
+                    <div
+                      className={`text-sm mt-1 ${
+                        isDark ? "text-pink-400" : "text-pink-600"
+                      }`}
+                    >
+                      Female
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Class-wise Distribution */}
+              {statistics.classCounts && statistics.classCounts.length > 0 && (
+                <div>
+                  <h4
+                    className={`text-lg font-semibold mb-4 ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    {selectedStudent.fullName}
-                  </h3>
-                  <p
-                    className={`${isDark ? "text-gray-400" : "text-gray-600"}`}
-                  >
-                    Roll Number: {selectedStudent.rollNumber}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <Mail
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Email
-                    </span>
+                    Class-wise Distribution
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {statistics.classCounts.map((item) => (
+                      <div
+                        key={item._id}
+                        className={`p-4 rounded-xl border ${
+                          isDark
+                            ? "bg-gray-700 border-gray-600"
+                            : "bg-white border-gray-200"
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div
+                            className={`text-2xl font-bold ${
+                              isDark ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {item.count}
+                          </div>
+                          <div
+                            className={`text-sm mt-1 ${
+                              isDark ? "text-gray-400" : "text-gray-600"
+                            }`}
+                          >
+                            {item.className}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.email}
-                  </p>
                 </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <BookOpen
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Class
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.className}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <Phone
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Phone
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.phone || "Not provided"}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <User
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Gender
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.gender || "Not specified"}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <Calendar
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Date of Birth
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.dob
-                      ? new Date(selectedStudent.dob).toLocaleDateString()
-                      : "Not provided"}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <Calendar
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Enrolled Date
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {new Date(
-                      selectedStudent.enrolledDate
-                    ).toLocaleDateString()}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <UserCheck
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Guardian Name
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.guardianName || "Not provided"}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center mb-2">
-                    <Phone
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Guardian Phone
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.guardianPhoneNumber || "Not provided"}
-                  </p>
-                </div>
-
-                <div className="md:col-span-2">
-                  <div className="flex items-center mb-2">
-                    <MapPin
-                      className={`w-5 h-5 mr-2 ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      Address
-                    </span>
-                  </div>
-                  <p
-                    className={`ml-7 ${
-                      isDark ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
-                    {selectedStudent.address || "Not provided"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-8">
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    openEditModal(selectedStudent);
-                  }}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200"
-                >
-                  Edit Student
-                </button>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setSelectedStudent(null);
-                  }}
-                  className={`px-6 py-3 rounded-xl border font-medium transition-colors ${
-                    isDark
-                      ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Close
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default StudentManagement;
+}

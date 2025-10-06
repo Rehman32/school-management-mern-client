@@ -1,53 +1,48 @@
-import api from '../utils/axiosInstance';
+// teacherApi.js
 
-export const listTeachers = async (params = {}) => {
-  const res = await api.get("/teachers", { params });
-  return res.data;
-};
-export const listTeachersMinimal = async ({ page = 1, limit = 1000, search = "" } = {}) => {
-  const res = await api.get("/teachers/minimal", { params: { page, limit, search } });
-  return res.data;
-};
+import axiosInstance from "../utils/axiosInstance";
 
-export const getTeacherById = async (id) => {
-  const res = await api.get(`/teachers/${id}`);
-  return res.data;
-};
+// ============================================
+// TEACHER CRUD OPERATIONS
+// ============================================
 
-export const createTeacher = async (payload) => {
-  const res = await api.post("/teachers", payload);
-  return res.data;
-};
-
-export const updateTeacher = async (id, payload) => {
-  const res = await api.put(`/teachers/${id}`, payload);
-  return res.data;
-};
-
-export const deleteTeacher = async (id) => {
-  const res = await api.delete(`/teachers/${id}`);
-  return res.data;
-};
+// List teachers (with filters)
+export const listTeachers = (params = {}) =>
+  axiosInstance.get("/teachers", { params });
 
 
+// Get teacher by ID
+export const getTeacherById = (id) =>
+  axiosInstance.get(`/teachers/${id}`);
 
-// New assignment APIs
-export const createAssignment = async (teacherId, payload) => {
-  const res = await api.post(`/teachers/${teacherId}/assign`, payload);
-  return res.data;
-};
+// Create teacher
+export const createTeacher = (data) =>
+  axiosInstance.post("/teachers", data);
 
-export const getAssignments = async (teacherId) => {
-  const res = await api.get(`/teachers/${teacherId}/assignments`);
-  return res.data;
-};
+// Update teacher
+export const updateTeacher = (id, data) =>
+  axiosInstance.put(`/teachers/${id}`, data);
 
-export const updateAssignment = async (teacherId, assignmentId, payload) => {
-  const res = await api.put(`/teachers/${teacherId}/assign/${assignmentId}`, payload);
-  return res.data;
-};
+// Delete teacher
+export const deleteTeacher = (id) =>
+  axiosInstance.delete(`/teachers/${id}`);
 
-export const deleteAssignment = async (teacherId, assignmentId) => {
-  const res = await api.delete(`/teachers/${teacherId}/assign/${assignmentId}`);
-  return res.data;
-};
+// Get statistics
+export const getStatistics = () =>
+  axiosInstance.get("/teachers/statistics");
+
+// Get departments
+export const getDepartments = () =>
+  axiosInstance.get("/teachers/departments");
+
+// ============================================
+// BULK OPERATIONS
+// ============================================
+
+// Bulk update status
+export const bulkUpdateStatus = (data) =>
+  axiosInstance.post("/teachers/bulk-update-status", data);
+
+// Bulk delete teachers
+export const bulkDelete = (teacherIds) =>
+  axiosInstance.post("/teachers/bulk-delete", { teacherIds });

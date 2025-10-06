@@ -1,23 +1,35 @@
-import api from "../utils/axiosInstance";
-export const listClasses = async () => (await api.get("/classes")).data;
-// export const createClass = async (payload) => (await api.post("/classes", payload)).data;
+// ============================================
+// ENHANCED CLASS API CLIENT
+// ============================================
 
-export const fetchClasses = async ({ page = 1, limit = 10, search = "" } = {}) => {
-  const res = await api.get("/classes", { params: { page, limit, search } });
-  return res.data;
-};
+import axiosInstance from "../utils/axiosInstance";
 
-export const createClass = async (payload) => {
-  const res = await api.post("/classes", payload);
-  return res.data;
-};
+// CRUD Operations
+export const listClasses = (params = {}) =>
+  axiosInstance.get("/classes", { params });
 
-export const updateClass = async (id, payload) => {
-  const res = await api.put(`/classes/${id}`, payload);
-  return res.data;
-};
+export const getClassById = (id) =>
+  axiosInstance.get(`/classes/${id}`);
 
-export const deleteClass = async (id) => {
-  const res = await api.delete(`/classes/${id}`);
-  return res.data;
-};
+export const createClass = (data) =>
+  axiosInstance.post("/classes", data);
+
+export const updateClass = (id, data) =>
+  axiosInstance.put(`/classes/${id}`, data);
+
+export const deleteClass = (id) =>
+  axiosInstance.delete(`/classes/${id}`);
+
+// Statistics & Reports
+export const getClassStatistics = () =>
+  axiosInstance.get("/classes/statistics");
+
+// Operations
+export const updateEnrollmentCount = (id) =>
+  axiosInstance.put(`/classes/${id}/enrollment`);
+
+export const bulkCreateClasses = (classes) =>
+  axiosInstance.post("/classes/bulk-create", { classes });
+
+// Legacy support
+export const fetchClasses = listClasses;

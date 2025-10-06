@@ -1,26 +1,35 @@
-import api from "../utils/axiosInstance";
-export const listSubjects = async () => {
-  const res = await api.get("/subjects");
-  return res.data;
-};
-// export const createSubject = async (payload) => (await api.post("/subjects", payload)).data;
+// ============================================
+// ENHANCED SUBJECT API CLIENT
+// ============================================
 
-export const fetchSubjects = async ({ page = 1, limit = 10, search = "" } = {}) => {
-  const res = await api.get("/subjects", { params: { page, limit, search } });
-  return res.data;
-};
+import axiosInstance from "../utils/axiosInstance";
 
-export const createSubject = async (payload) => {
-  const res = await api.post("/subjects", payload);
-  return res.data;
-};
+// CRUD Operations
+export const listSubjects = (params = {}) =>
+  axiosInstance.get("/subjects", { params });
 
-export const updateSubject = async (id, payload) => {
-  const res = await api.put(`/subjects/${id}`, payload);
-  return res.data;
-};
+export const getSubjectById = (id) =>
+  axiosInstance.get(`/subjects/${id}`);
 
-export const deleteSubject = async (id) => {
-  const res = await api.delete(`/subjects/${id}`);
-  return res.data;
-};
+export const createSubject = (data) =>
+  axiosInstance.post("/subjects", data);
+
+export const updateSubject = (id, data) =>
+  axiosInstance.put(`/subjects/${id}`, data);
+
+export const deleteSubject = (id) =>
+  axiosInstance.delete(`/subjects/${id}`);
+
+// Query Operations
+export const getSubjectsByCategory = (category) =>
+  axiosInstance.get(`/subjects/category/${category}`);
+
+export const getSubjectsForGrade = (grade) =>
+  axiosInstance.get(`/subjects/grade/${grade}`);
+
+// Bulk Operations
+export const bulkCreateSubjects = (subjects) =>
+  axiosInstance.post("/subjects/bulk-create", { subjects });
+
+// Legacy support
+export const fetchSubjects = listSubjects;

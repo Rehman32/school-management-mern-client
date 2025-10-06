@@ -1,4 +1,3 @@
-//clinet/app.jsx
 import { useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import Login from "./pages/Login";
@@ -19,17 +18,29 @@ import AcademicsManagement from "./pages/admin/AcademicsManagement";
 import TimetableManagement from "./pages/admin/TimetableManagement";
 import SettingsPage from "./pages/admin/SettingsPage";
 
-function App() {
-  const [count, setCount] = useState(0);
+// NEW IMPORTS
+import SchoolRegister from "./pages/auth/SchoolRegister";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 
+function App() {
   return (
     <>
       <div className="bg-gray-100 min-h-screen">
         <Routes>
-          <Route path="/register" element={<Register />} />
+          {/* ===== PUBLIC ROUTES ===== */}
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* NEW AUTH ROUTES */}
+          <Route path="/register-school" element={<SchoolRegister />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
+          {/* ===== ADMIN ROUTES ===== */}
           <Route
             path="/admin"
             element={
@@ -39,21 +50,21 @@ function App() {
             }
           />
           <Route
-            path="/admin/students"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminDashboard>
-                  <StudentList />
-                </AdminDashboard>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/admin/dashboard"
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminDashboard>
                   <AdminDashboardStats />
+                </AdminDashboard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/students"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminDashboard>
+                  <StudentList />
                 </AdminDashboard>
               </ProtectedRoute>
             }
@@ -118,7 +129,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-         
           <Route
             path="/admin/settings"
             element={
@@ -130,6 +140,7 @@ function App() {
             }
           />
 
+          {/* ===== TEACHER & STUDENT ROUTES ===== */}
           <Route
             path="/student"
             element={
@@ -147,7 +158,7 @@ function App() {
             }
           />
         </Routes>
-        <Toaster />
+        <Toaster position="top-right" />
       </div>
     </>
   );

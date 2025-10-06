@@ -1,3 +1,4 @@
+//src/pages/Register.jsx
 import axios from "../utils/axiosInstance";
 import React, { useState } from "react";
 import toast from "react-hot-toast";

@@ -1,63 +1,141 @@
-//client/src/context/authContext.jsx
-import { createContext, useContext, useEffect, useState } from "react";
+// ============================================
+// ENHANCED AUTH CONTEXT
+// With refresh tokens & auto token refresh
+// ============================================
+
+import { createContext, useContext, useEffect, useState } from 'react';
 import axios from '../utils/axiosInstance';
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
+
 const AuthContext = createContext(null);
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(sessionStorage.getItem("role") || null);
-  const [token, setToken] = useState(sessionStorage.getItem("token") || null);
-  const navigate =useNavigate();
-  // axiosInstance adds Authorization from sessionStorage on each request via interceptor
-    
-  
-  const login = async (userToken) => {
-    setToken(userToken);
-    sessionStorage.setItem('token', userToken);
+  const [role, setRole] = useState(localStorage.getItem('role') || null);
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-    try {
-      const res = await axios.get('/me');
-      setUser(res.data.user);
-      setRole(res.data.user.role);
-      sessionStorage.setItem('role', res.data.user.role);
-    //redirect based on role
-    if(res.data.user.role === 'admin'){
-      navigate('/admin');
-    }else if(res.data.user.role === 'teacher'){
+  // Initialize auth state on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        try {
+          // Verify token is still valid by fetching user
+          const res = await axios.get('/auth/me');
+          const userData = res.data.data?.user || res.data.user;
+          setUser(userData);
+          setRole(userData.role);
+          setToken(storedToken);
+        } catch (error) {
+          console.error('Token invalid, clearing auth');
+          logout();
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
+  }, []);
+
+  /**
+ * Login - Store token and fetch user info (FIXED)
+ */
+const login = async (accessToken) => {
+  try {
+    console.log('🔍 AuthContext: Storing token'); // DEBUG
+    
+    setToken(accessToken);
+    localStorage.setItem('token', accessToken);
+
+    // Fetch user info
+    console.log('🔍 AuthContext: Fetching user info'); // DEBUG
+    const res = await axios.get('/auth/me');
+    
+    console.log('✅ AuthContext: Response received:', res.data); // DEBUG
+
+    // Handle different response formats
+    const userData = res.data?.data?.user || res.data?.user || res.data?.data;
+    
+    console.log('✅ AuthContext: User data:', userData); // DEBUG
+
+    if (!userData || !userData.role) {
+      console.error('❌ AuthContext: Invalid user data format:', res.data);
+      throw new Error('Invalid user data received from server');
+    }
+
+    setUser(userData);
+    setRole(userData.role);
+    localStorage.setItem('role', userData.role);
+
+    // Redirect based on role
+    console.log('✅ AuthContext: Redirecting to', userData.role, 'dashboard'); // DEBUG
+    
+    if (userData.role === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (userData.role === 'teacher') {
       navigate('/teacher');
-    }else if(res.data.user.role === 'student'){
+    } else if (userData.role === 'student') {
       navigate('/student');
+    } else {
+      console.error('❌ Unknown role:', userData.role);
+      navigate('/');
     }
-    else{
-      navigate('login');
-      console.error('Role is not defined ...')
-    }
-   
   } catch (err) {
-    console.error('Error fetching user info:', err);
+    console.error('❌ AuthContext: Error fetching user info:', err);
+    console.error('Response:', err.response?.data);
+    logout(); // Clear invalid state
   }
 };
 
 
-  const logout = () =>{
-    setUser(null);
-    setRole(null);
-    setToken(null);
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('role');
-    delete axios.defaults.headers.common['Authorization'];
-    navigate('/login');
+  /**
+   * Logout - Clear everything
+   */
+  const logout = async () => {
+    try {
+      // Call backend logout (revokes refresh token)
+      await axios.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear local state regardless
+      setUser(null);
+      setRole(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('role');
+      delete axios.defaults.headers.common['Authorization'];
+      navigate('/login');
+    }
   };
 
-  const authData = {user, token, role , login, logout};
+  /**
+   * Update user info (after profile update)
+   */
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+  };
 
-  return(
-    <AuthContext.Provider value={authData}>
-        {children}
-    </AuthContext.Provider>
-  );
+  const authData = {
+    user,
+    token,
+    role,
+    loading,
+    login,
+    logout,
+    updateUser,
+    isAuthenticated: !!token,
+  };
+
+  return <AuthContext.Provider value={authData}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
-    return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
 };

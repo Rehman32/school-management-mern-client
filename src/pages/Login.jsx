@@ -18,14 +18,37 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+
+    console.log('🔍 Frontend: Attempting login with:', formData.email); // DEBUG
+
     try {
-      const res = await axios.post('/auth/login', formData);
-      const { token } = res.data || {};
+      // Make sure we're sending the data correctly
+      const response = await axios.post('/auth/login', {
+        email: formData.email.trim(), // Remove whitespace
+        password: formData.password,
+      });
+
+      console.log('✅ Frontend: Login response:', response.data); // DEBUG
+
+      // Extract token from response
+      const token = response.data?.data?.accessToken || response.data?.accessToken || response.data?.token;
+
+      if (!token) {
+        console.error('❌ Frontend: No token in response:', response.data);
+        toast.error('Login failed: No token received');
+        return;
+      }
+
       login(token);
       toast.success("Login Successful");
     } catch (error) {
-      toast.error(error.response?.data?.msg || 'Login Failed');
-      console.error(error);
+      console.error('❌ Frontend: Login error:', error);
+      console.error('Response data:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.msg || 
+                          'Login Failed';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -92,6 +115,7 @@ export default function Login() {
                   value={formData.email}
                   placeholder="Enter your email"
                   required
+                  autoComplete="email"
                   className="block w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 outline-none text-gray-900 placeholder-gray-400"
                 />
               </div>
@@ -117,6 +141,7 @@ export default function Login() {
                   onChange={handleChange}
                   value={formData.password}
                   required
+                  autoComplete="current-password"
                   className="block w-full pl-11 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 outline-none text-gray-900 placeholder-gray-400"
                 />
                 <button

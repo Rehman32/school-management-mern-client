@@ -1,3 +1,4 @@
+//SubjectTable.jsx
 export default function SubjectTable({ rows, isDark, onEdit, onDelete }) {
   const table = isDark ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900";
   const th = isDark ? "text-slate-300" : "text-slate-600";

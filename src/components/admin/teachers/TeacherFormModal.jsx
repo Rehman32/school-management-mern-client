@@ -1,4 +1,4 @@
-// Corrected TeacherFormModal.js
+//  TeacherFormModal.js
 import { useEffect, useState } from "react";
 import { X } from 'lucide-react';
 

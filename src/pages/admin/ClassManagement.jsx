@@ -1,4 +1,4 @@
-// CLASS MANAGEMENT COMPONENT
+// ClassManagement.jsx
 
 import React, { useEffect, useState } from "react";
 import {

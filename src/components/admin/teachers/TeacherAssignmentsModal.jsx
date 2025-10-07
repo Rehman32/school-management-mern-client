@@ -1,3 +1,5 @@
+//TeacherAssignmentModal.jsx
+
 import { useEffect, useState } from "react";
 import { X, Plus, Trash2, Edit } from "lucide-react";
 import { getAssignments, createAssignment, updateAssignment, deleteAssignment } from "../../../api/teacherApi";

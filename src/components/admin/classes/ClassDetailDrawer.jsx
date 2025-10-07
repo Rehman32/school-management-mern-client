@@ -1,3 +1,4 @@
+//CLassDetailDrawer.jsx
 import { useEffect, useState } from "react";
 import { listAssignmentsByClass, createAssignmentAPI, deleteAssignmentAPI } from "../../../api/assignmentApi";
 import AssignTeacherModal from "./AssignTeacherModal";

@@ -1,3 +1,5 @@
+//TeacherProfileModal.jsx
+
 import {
   Mail,
   Phone,

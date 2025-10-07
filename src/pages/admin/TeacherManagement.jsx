@@ -1,4 +1,4 @@
-// ============================================
+// TeacherManagement.jsx
 // COMPLETE TEACHER MANAGEMENT COMPONENT
 // WITH ALL MODALS FULLY IMPLEMENTED
 // ============================================

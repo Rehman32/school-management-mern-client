@@ -1,3 +1,5 @@
+//classFormModal.jsx
+
 import { useEffect, useState } from "react";
 
 export default function ClassFormModal({ open, onClose, onSubmit, initialData, isDark }) {

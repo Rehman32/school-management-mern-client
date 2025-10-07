@@ -1,3 +1,5 @@
+//CLassTable.jsx
+
 export default function ClassTable({ rows, isDark, onEdit, onDelete,onManage }) {
   const table = isDark ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900";
   const th = isDark ? "text-slate-300" : "text-slate-600";

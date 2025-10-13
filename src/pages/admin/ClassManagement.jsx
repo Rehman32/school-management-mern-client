@@ -1050,14 +1050,7 @@ export default function ClassManagement({ isDark }) {
         {/* Subjects Tab */}
         {tab === "subjects" && (
           <>
-            {/* Similar structure for subjects - truncated for brevity */}
-            <div
-              className={`text-center p-12 ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
-              Subjects tab content (similar to classes, see full code)
-            </div>
+       
           </>
         )}
 

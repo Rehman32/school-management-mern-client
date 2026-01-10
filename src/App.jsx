@@ -1,11 +1,8 @@
-import { useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/common/ProtectedRoute";
-import TeacherDashboard from "./pages/teacher/TeacherDashboard";
-import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentList from "./pages/admin/StudentManagement";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -18,8 +15,7 @@ import AcademicsManagement from "./pages/admin/AcademicsManagement";
 import TimetableManagement from "./pages/admin/TimetableManagement";
 import SettingsPage from "./pages/admin/SettingsPage";
 
-// NEW IMPORTS
-import SchoolRegister from "./pages/auth/SchoolRegister";
+// Auth Routes
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
@@ -34,8 +30,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           
-          {/* NEW AUTH ROUTES */}
-          <Route path="/register-school" element={<SchoolRegister />} />
+          {/* Auth Routes */}
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -44,7 +39,7 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard />
               </ProtectedRoute>
             }
@@ -52,7 +47,7 @@ function App() {
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <AdminDashboardStats />
                 </AdminDashboard>
@@ -62,7 +57,7 @@ function App() {
           <Route
             path="/admin/students"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <StudentList />
                 </AdminDashboard>
@@ -72,7 +67,7 @@ function App() {
           <Route
             path="/admin/teachers"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <TeacherManagement />
                 </AdminDashboard>
@@ -82,7 +77,7 @@ function App() {
           <Route
             path="/admin/classes"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <ClassManagement />
                 </AdminDashboard>
@@ -92,7 +87,7 @@ function App() {
           <Route
             path="/admin/attendance"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <AttendanceManagement />
                 </AdminDashboard>
@@ -102,7 +97,7 @@ function App() {
           <Route
             path="/admin/fees"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <FeesManagement />
                 </AdminDashboard>
@@ -112,7 +107,7 @@ function App() {
           <Route
             path="/admin/academics"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <AcademicsManagement />
                 </AdminDashboard>
@@ -122,7 +117,7 @@ function App() {
           <Route
             path="/admin/timetable"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <TimetableManagement />
                 </AdminDashboard>
@@ -132,28 +127,10 @@ function App() {
           <Route
             path="/admin/settings"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute>
                 <AdminDashboard>
                   <SettingsPage />
                 </AdminDashboard>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* ===== TEACHER & STUDENT ROUTES ===== */}
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute allowedRoles={["student"]}>
-                <StudentDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher"
-            element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <TeacherDashboard />
               </ProtectedRoute>
             }
           />

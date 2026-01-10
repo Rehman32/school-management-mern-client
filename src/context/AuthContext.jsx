@@ -72,15 +72,11 @@ const login = async (accessToken) => {
     // Redirect based on role
     console.log('✅ AuthContext: Redirecting to', userData.role, 'dashboard'); // DEBUG
     
-    if (userData.role === 'admin') {
+    if (userData.role === 'admin' || userData.role === 'teacher') {
       navigate('/admin/dashboard');
-    } else if (userData.role === 'teacher') {
-      navigate('/teacher');
-    } else if (userData.role === 'student') {
-      navigate('/student');
     } else {
-      console.error('❌ Unknown role:', userData.role);
-      navigate('/');
+      console.error('❌ Unauthorized role:', userData.role);
+      logout();
     }
   } catch (err) {
     console.error('❌ AuthContext: Error fetching user info:', err);

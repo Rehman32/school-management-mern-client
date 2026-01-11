@@ -43,7 +43,7 @@ const Sidebar = ({ open, isDark, onItemClick, activeTab, setActiveTab }) => {
   const getItemClasses = (itemId) => {
     return `w-full flex items-center p-2 cursor-pointer rounded-xl transition-all duration-200 group relative overflow-hidden ${
       activeTab === itemId
-        ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-105"
+        ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/25 transform scale-[1.02]"
         : isDark
         ? "text-gray-300 hover:bg-gray-800 hover:text-white"
         : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"

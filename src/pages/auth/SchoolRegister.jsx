@@ -1,6 +1,6 @@
 // ============================================
-// SCHOOL REGISTRATION PAGE - INDUSTRY GRADE
-// Clean, modern school onboarding flow
+// SCHOOL REGISTRATION PAGE - UI POLISHED
+// Consistent with Login using Lucide icons
 // ============================================
 
 import { useState } from 'react';
@@ -9,10 +9,20 @@ import { registerSchool } from '../../api/authApi';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { 
-  FaSchool, FaUser, FaEnvelope, FaLock, FaPhone, 
-  FaMapMarkerAlt, FaCity, FaGlobe, FaArrowRight, 
-  FaArrowLeft, FaCheck, FaGraduationCap
-} from 'react-icons/fa';
+  Building2, 
+  User, 
+  Mail, 
+  Lock, 
+  Phone, 
+  MapPin, 
+  Building, 
+  Globe, 
+  ArrowRight, 
+  ArrowLeft, 
+  CheckCircle, 
+  GraduationCap,
+  BookOpen
+} from 'lucide-react';
 import './SchoolRegister.css';
 
 const SchoolRegister = () => {
@@ -24,7 +34,6 @@ const SchoolRegister = () => {
   const [errors, setErrors] = useState({});
   
   const [formData, setFormData] = useState({
-    // School Info
     schoolName: '',
     schoolEmail: '',
     schoolPhone: '',
@@ -33,8 +42,6 @@ const SchoolRegister = () => {
     state: '',
     country: 'Pakistan',
     board: 'State Board',
-    
-    // Admin Info
     adminName: '',
     adminEmail: '',
     adminPassword: '',
@@ -44,7 +51,6 @@ const SchoolRegister = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error when field changes
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -52,7 +58,6 @@ const SchoolRegister = () => {
 
   const validateStep1 = () => {
     const newErrors = {};
-    
     if (!formData.schoolName.trim()) {
       newErrors.schoolName = 'School name is required';
     }
@@ -61,14 +66,12 @@ const SchoolRegister = () => {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.schoolEmail)) {
       newErrors.schoolEmail = 'Invalid email format';
     }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = () => {
     const newErrors = {};
-    
     if (!formData.adminName.trim()) {
       newErrors.adminName = 'Your name is required';
     }
@@ -85,7 +88,6 @@ const SchoolRegister = () => {
     if (formData.adminPassword !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -102,7 +104,6 @@ const SchoolRegister = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateStep2()) return;
     
     setLoading(true);
@@ -122,7 +123,6 @@ const SchoolRegister = () => {
         adminPassword: formData.adminPassword
       });
       
-      // Store token and login
       if (result.data?.accessToken) {
         localStorage.setItem('token', result.data.accessToken);
         if (authLogin) {
@@ -148,22 +148,28 @@ const SchoolRegister = () => {
         {/* Left side - Branding */}
         <div className="branding-section">
           <div className="brand-content">
-            <FaGraduationCap className="brand-icon" />
+            <div className="brand-icon-wrapper">
+              <GraduationCap size={48} />
+            </div>
             <h1>School Management System</h1>
             <p>Set up your school's digital management platform in minutes</p>
             
             <div className="features-list">
               <div className="feature-item">
-                <FaCheck /> Student & Teacher Management
+                <CheckCircle size={18} />
+                <span>Student & Teacher Management</span>
               </div>
               <div className="feature-item">
-                <FaCheck /> Attendance & Fee Tracking
+                <CheckCircle size={18} />
+                <span>Attendance & Fee Tracking</span>
               </div>
               <div className="feature-item">
-                <FaCheck /> Exams & Report Cards
+                <CheckCircle size={18} />
+                <span>Exams & Report Cards</span>
               </div>
               <div className="feature-item">
-                <FaCheck /> Timetable Management
+                <CheckCircle size={18} />
+                <span>Timetable Management</span>
               </div>
             </div>
           </div>
@@ -193,7 +199,8 @@ const SchoolRegister = () => {
               <div className="form-step">
                 <div className="input-group">
                   <label>
-                    <FaSchool /> School Name *
+                    <Building2 size={16} />
+                    School Name *
                   </label>
                   <input
                     type="text"
@@ -208,7 +215,8 @@ const SchoolRegister = () => {
 
                 <div className="input-group">
                   <label>
-                    <FaEnvelope /> School Email *
+                    <Mail size={16} />
+                    School Email *
                   </label>
                   <input
                     type="email"
@@ -224,7 +232,8 @@ const SchoolRegister = () => {
                 <div className="input-row">
                   <div className="input-group">
                     <label>
-                      <FaPhone /> Phone
+                      <Phone size={16} />
+                      Phone
                     </label>
                     <input
                       type="tel"
@@ -237,7 +246,8 @@ const SchoolRegister = () => {
 
                   <div className="input-group">
                     <label>
-                      <FaGlobe /> Board
+                      <BookOpen size={16} />
+                      Board
                     </label>
                     <select
                       name="board"
@@ -256,7 +266,8 @@ const SchoolRegister = () => {
 
                 <div className="input-group">
                   <label>
-                    <FaMapMarkerAlt /> Address
+                    <MapPin size={16} />
+                    Address
                   </label>
                   <input
                     type="text"
@@ -270,7 +281,8 @@ const SchoolRegister = () => {
                 <div className="input-row">
                   <div className="input-group">
                     <label>
-                      <FaCity /> City
+                      <Building size={16} />
+                      City
                     </label>
                     <input
                       type="text"
@@ -294,7 +306,7 @@ const SchoolRegister = () => {
                 </div>
 
                 <button type="button" className="btn-next" onClick={handleNext}>
-                  Next Step <FaArrowRight />
+                  Next Step <ArrowRight size={18} />
                 </button>
               </div>
             )}
@@ -308,7 +320,8 @@ const SchoolRegister = () => {
 
                 <div className="input-group">
                   <label>
-                    <FaUser /> Your Full Name *
+                    <User size={16} />
+                    Your Full Name *
                   </label>
                   <input
                     type="text"
@@ -323,7 +336,8 @@ const SchoolRegister = () => {
 
                 <div className="input-group">
                   <label>
-                    <FaEnvelope /> Your Email *
+                    <Mail size={16} />
+                    Your Email *
                   </label>
                   <input
                     type="email"
@@ -338,7 +352,8 @@ const SchoolRegister = () => {
 
                 <div className="input-group">
                   <label>
-                    <FaLock /> Password *
+                    <Lock size={16} />
+                    Password *
                   </label>
                   <input
                     type="password"
@@ -353,7 +368,8 @@ const SchoolRegister = () => {
 
                 <div className="input-group">
                   <label>
-                    <FaLock /> Confirm Password *
+                    <Lock size={16} />
+                    Confirm Password *
                   </label>
                   <input
                     type="password"
@@ -368,10 +384,17 @@ const SchoolRegister = () => {
 
                 <div className="button-row">
                   <button type="button" className="btn-back" onClick={handleBack}>
-                    <FaArrowLeft /> Back
+                    <ArrowLeft size={18} /> Back
                   </button>
                   <button type="submit" className="btn-submit" disabled={loading}>
-                    {loading ? 'Creating...' : 'Create School Account'}
+                    {loading ? (
+                      <>
+                        <div className="spinner" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create School Account'
+                    )}
                   </button>
                 </div>
               </div>

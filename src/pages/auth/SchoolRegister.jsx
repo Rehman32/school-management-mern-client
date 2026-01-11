@@ -41,7 +41,7 @@ const SchoolRegister = () => {
     city: '',
     state: '',
     country: 'Pakistan',
-    board: 'State Board',
+    board: 'Federal Board',
     adminName: '',
     adminEmail: '',
     adminPassword: '',
@@ -240,7 +240,7 @@ const SchoolRegister = () => {
                       name="schoolPhone"
                       value={formData.schoolPhone}
                       onChange={handleChange}
-                      placeholder="+92 300 1234567"
+                      placeholder="0300-1234567"
                     />
                   </div>
 
@@ -254,11 +254,16 @@ const SchoolRegister = () => {
                       value={formData.board}
                       onChange={handleChange}
                     >
-                      <option value="State Board">State Board</option>
-                      <option value="CBSE">CBSE</option>
-                      <option value="ICSE">ICSE</option>
-                      <option value="Cambridge">Cambridge</option>
-                      <option value="IB">IB</option>
+                      <option value="Federal Board">Federal Board (FBISE)</option>
+                      <option value="Punjab Board">Punjab Board (BISE Punjab)</option>
+                      <option value="Sindh Board">Sindh Board (BISE Sindh)</option>
+                      <option value="KPK Board">KPK Board (BISE KPK)</option>
+                      <option value="Balochistan Board">Balochistan Board</option>
+                      <option value="BISE Swat">BISE Swat</option>
+                      <option value="BISE Mardan">BISE Mardan</option>
+                      <option value="BISE Peshawar">BISE Peshawar</option>
+                      <option value="Aga Khan Board">Aga Khan Board</option>
+                      <option value="Cambridge">Cambridge (O/A Levels)</option>
                       <option value="Other">Other</option>
                     </select>
                   </div>

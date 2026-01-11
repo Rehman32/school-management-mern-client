@@ -44,12 +44,12 @@ export default function SettingsPage({ isDark }) {
     address: '',
     city: '',
     state: '',
-    country: 'India',
+    country: 'Pakistan',
     pincode: '',
     website: '',
     logo: '',
     description: '',
-    board: 'State Board',
+    board: 'Federal Board',
     establishedYear: '',
     principal: {
       name: '',
@@ -326,14 +326,20 @@ export default function SettingsPage({ isDark }) {
                       <SelectField
                         label="Board"
                         icon={BookOpen}
-                        value={profile.board || 'State Board'}
+                        value={profile.board || 'Federal Board'}
                         onChange={(e) => handleChange('board', e.target.value)}
                         options={[
-                          { value: 'CBSE', label: 'CBSE' },
-                          { value: 'ICSE', label: 'ICSE' },
-                          { value: 'State Board', label: 'State Board' },
-                          { value: 'IB', label: 'IB' },
-                          { value: 'Cambridge', label: 'Cambridge' },
+                          { value: 'Federal Board', label: 'Federal Board (FBISE)' },
+                          { value: 'Punjab Board', label: 'Punjab Board (BISE Punjab)' },
+                          { value: 'Sindh Board', label: 'Sindh Board (BISE Sindh)' },
+                          { value: 'KPK Board', label: 'KPK Board (BISE KPK)' },
+                          { value: 'Balochistan Board', label: 'Balochistan Board' },
+                          { value: 'BISE Swat', label: 'BISE Swat' },
+                          { value: 'BISE Mardan', label: 'BISE Mardan' },
+                          { value: 'BISE Peshawar', label: 'BISE Peshawar' },
+                          { value: 'Aga Khan Board', label: 'Aga Khan Board' },
+                          { value: 'Cambridge', label: 'Cambridge (O/A Levels)' },
+                          { value: 'Other', label: 'Other' },
                         ]}
                       />
 

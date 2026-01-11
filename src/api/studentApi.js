@@ -3,7 +3,7 @@ import axiosInstance from '../utils/axiosInstance';
 
 // ============================================
 // STUDENT CRUD OPERATIONS
-//studentApi.js
+// studentApi.js
 // ============================================
 
 // Get all students (with filters)
@@ -43,7 +43,47 @@ export const bulkDelete = (studentIds) =>
   axiosInstance.post('/students/bulk-delete', { studentIds });
 
 // ============================================
-// LEGACY SUPPORT (for backward compatibility)
+// PHOTO MANAGEMENT
+// ============================================
+
+// Upload student photo
+export const uploadStudentPhoto = (studentId, photoFile) => {
+  const formData = new FormData();
+  formData.append('photo', photoFile);
+  return axiosInstance.post(`/students/${studentId}/photo`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+// Delete student photo
+export const deleteStudentPhoto = (studentId) => 
+  axiosInstance.delete(`/students/${studentId}/photo`);
+
+// ============================================
+// DOCUMENT MANAGEMENT
+// ============================================
+
+// Get student documents
+export const getStudentDocuments = (studentId) => 
+  axiosInstance.get(`/students/${studentId}/documents`);
+
+// Upload student document
+export const uploadStudentDocument = (studentId, file, documentType, documentName) => {
+  const formData = new FormData();
+  formData.append('document', file);
+  formData.append('documentType', documentType);
+  formData.append('documentName', documentName);
+  return axiosInstance.post(`/students/${studentId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};
+
+// Delete student document
+export const deleteStudentDocument = (studentId, documentId) => 
+  axiosInstance.delete(`/students/${studentId}/documents/${documentId}`);
+
+// ============================================
+// LEGACY SUPPORT
 // ============================================
 
 export const listStudents = async (params = {}) => {

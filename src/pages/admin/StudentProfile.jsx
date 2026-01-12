@@ -36,6 +36,9 @@ import { getStudentFees } from '../../api/feesApi';
 import { getStudentGrades } from '../../api/examApi';
 import ReceiptModal from '../../components/admin/fees/ReceiptModal';
 import ReportCardModal from '../../components/admin/academics/ReportCardModal';
+import AttendanceCalendar from '../../components/admin/attendance/AttendanceCalendar';
+import IDCardModal from '../../components/admin/students/IDCardModal';
+import { IdCard } from 'lucide-react';
 
 const StudentProfile = ({ isDark }) => {
   const { id } = useParams();
@@ -58,6 +61,7 @@ const StudentProfile = ({ isDark }) => {
   const [grades, setGrades] = useState([]);
   const [gradesLoading, setGradesLoading] = useState(false);
   const [showReportCard, setShowReportCard] = useState(false);
+  const [showIDCard, setShowIDCard] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -306,6 +310,16 @@ const StudentProfile = ({ isDark }) => {
                     Admission No: {student.admissionNumber || 'N/A'} | Roll No: {student.rollNumber || 'N/A'}
                   </p>
                 </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowIDCard(true)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    isDark ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                  }`}
+                >
+                  <IdCard size={16} />
+                  ID Card
+                </button>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                   student.status === 'active'
                     ? 'bg-green-100 text-green-700'
@@ -313,6 +327,7 @@ const StudentProfile = ({ isDark }) => {
                 }`}>
                   {student.status}
                 </span>
+              </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
@@ -468,14 +483,11 @@ const StudentProfile = ({ isDark }) => {
 
         {/* Attendance Tab */}
         {activeTab === 'attendance' && (
-          <div className="text-center py-12">
-            <ClipboardList size={48} className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
-            <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div>
+            <h3 className={`text-lg font-semibold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Attendance History
             </h3>
-            <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-              Attendance calendar and statistics will be displayed here
-            </p>
+            <AttendanceCalendar studentId={id} isDark={isDark} />
           </div>
         )}
 
@@ -678,6 +690,14 @@ const StudentProfile = ({ isDark }) => {
         onClose={() => setShowReportCard(false)}
         student={student}
         examResults={grades}
+        isDark={isDark}
+      />
+
+      {/* ID Card Modal */}
+      <IDCardModal
+        isOpen={showIDCard}
+        onClose={() => setShowIDCard(false)}
+        student={student}
         isDark={isDark}
       />
     </div>

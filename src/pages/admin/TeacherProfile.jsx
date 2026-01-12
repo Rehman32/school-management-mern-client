@@ -22,6 +22,8 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { getTeacherById } from '../../api/teacherApi';
+import { getTeacherTimetable } from '../../api/timetableApi';
+import TimetableGrid from '../../components/admin/timetable/TimetableGrid';
 
 const TeacherProfile = ({ isDark }) => {
   const { id } = useParams();
@@ -30,6 +32,8 @@ const TeacherProfile = ({ isDark }) => {
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('info');
+  const [timetable, setTimetable] = useState([]);
+  const [timetableLoading, setTimetableLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -49,6 +53,24 @@ const TeacherProfile = ({ isDark }) => {
       setLoading(false);
     }
   };
+
+  const fetchTimetable = async () => {
+    setTimetableLoading(true);
+    try {
+      const res = await getTeacherTimetable(id);
+      setTimetable(res.data || res || []);
+    } catch (err) {
+      console.error('Failed to load timetable:', err);
+    } finally {
+      setTimetableLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'schedule' && id) {
+      fetchTimetable();
+    }
+  }, [activeTab, id]);
 
   const tabs = [
     { id: 'info', label: 'Information', icon: User },
@@ -323,14 +345,17 @@ const TeacherProfile = ({ isDark }) => {
 
         {/* Schedule Tab */}
         {activeTab === 'schedule' && (
-          <div className="text-center py-12">
-            <Clock size={48} className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
-            <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Teacher Schedule
+          <div>
+            <h3 className={`text-lg font-semibold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Weekly Schedule
             </h3>
-            <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-              Weekly timetable will be displayed here
-            </p>
+            {timetableLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <TimetableGrid timetable={timetable} isDark={isDark} />
+            )}
           </div>
         )}
       </div>

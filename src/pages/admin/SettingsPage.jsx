@@ -1,42 +1,38 @@
-// ENHANCED SETTINGS COMPONENT
+// ============================================
+// SETTINGS PAGE - STREAMLINED
+// client/src/pages/admin/SettingsPage.jsx
+// Clean, functional settings management
+// ============================================
 
 import React, { useEffect, useState } from 'react';
 import {
   getProfile,
   updateProfile,
   uploadLogo,
-  updateAcademicYear,
-  updateSystemSettings,
-  getStatistics,
 } from '../../api/settingsApi';
 import { toast } from 'react-hot-toast';
 import {
-  FaCog,
-  FaSave,
-  FaSchool,
-  FaMapMarkerAlt,
-  FaPhone,
-  FaImage,
-  FaEnvelope,
-  FaGlobe,
-  FaInfoCircle,
-  FaCheckCircle,
-  FaEdit,
-  FaCalendarAlt,
-  FaClock,
-  FaGraduationCap,
-  FaUserShield,
-  FaBell,
-  FaChartLine,
-  FaUpload,
-  FaTimes,
-} from 'react-icons/fa';
+  Settings,
+  Save,
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
+  Calendar,
+  Upload,
+  Users,
+  BookOpen,
+  Clock,
+  Percent,
+  GraduationCap,
+  RotateCcw,
+  CheckCircle
+} from 'lucide-react';
 
 const TABS = [
-  { id: 'profile', label: 'School Profile', icon: FaSchool },
-  { id: 'academic', label: 'Academic Settings', icon: FaGraduationCap },
-  { id: 'system', label: 'System Settings', icon: FaCog },
-  { id: 'statistics', label: 'Statistics', icon: FaChartLine },
+  { id: 'profile', label: 'School Profile', icon: Building2 },
+  { id: 'academic', label: 'Academic Settings', icon: GraduationCap },
 ];
 
 export default function SettingsPage({ isDark }) {
@@ -45,7 +41,6 @@ export default function SettingsPage({ isDark }) {
     name: '',
     email: '',
     phone: '',
-    alternatePhone: '',
     address: '',
     city: '',
     state: '',
@@ -54,8 +49,6 @@ export default function SettingsPage({ isDark }) {
     website: '',
     logo: '',
     description: '',
-    registrationNumber: '',
-    affiliationNumber: '',
     board: 'State Board',
     establishedYear: '',
     principal: {
@@ -63,28 +56,9 @@ export default function SettingsPage({ isDark }) {
       email: '',
       phone: '',
     },
-    vicePrincipal: {
-      name: '',
-      email: '',
-      phone: '',
-    },
     currentAcademicYear: '',
     passingPercentage: 33,
     attendancePercentageRequired: 75,
-    settings: {
-      dateFormat: 'DD/MM/YYYY',
-      timeFormat: '12',
-      timezone: 'Asia/Kolkata',
-      currency: 'INR',
-      language: 'en',
-      sessionTimeout: 30,
-      passwordMinLength: 8,
-      enableTwoFactor: false,
-      maxLoginAttempts: 5,
-      enableSMS: false,
-      enableEmail: true,
-      enableNotifications: true,
-    },
   });
 
   const [loading, setLoading] = useState(false);
@@ -92,46 +66,28 @@ export default function SettingsPage({ isDark }) {
   const [hasChanges, setHasChanges] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState(null);
-  const [statistics, setStatistics] = useState(null);
 
-  const fetch = async () => {
+  const fetchProfile = async () => {
     setFetchLoading(true);
     try {
       const res = await getProfile();
       const data = res.data.data || res.data;
-      setProfile({
-        ...profile,
+      setProfile((prev) => ({
+        ...prev,
         ...data,
-        settings: { ...profile.settings, ...data.settings },
-      });
+      }));
       setLogoPreview(data.logo);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to load profile');
+      toast.error('Failed to load settings');
     } finally {
       setFetchLoading(false);
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const res = await getStatistics();
-      setStatistics(res.data.data);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load statistics');
-    }
-  };
-
   useEffect(() => {
-    fetch();
+    fetchProfile();
   }, []);
-
-  useEffect(() => {
-    if (activeTab === 'statistics' && !statistics) {
-      fetchStats();
-    }
-  }, [activeTab]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -142,11 +98,7 @@ export default function SettingsPage({ isDark }) {
       setHasChanges(false);
     } catch (e) {
       console.error(e);
-      const errorMsg = e.response?.data?.message || 'Failed to save settings';
-      toast.error(errorMsg);
-      if (e.response?.data?.errors) {
-        e.response.data.errors.forEach(err => toast.error(err));
-      }
+      toast.error(e.response?.data?.message || 'Failed to save settings');
     } finally {
       setLoading(false);
     }
@@ -154,7 +106,6 @@ export default function SettingsPage({ isDark }) {
 
   const handleChange = (field, value) => {
     if (field.includes('.')) {
-      // Handle nested fields
       const keys = field.split('.');
       setProfile((prev) => {
         const updated = { ...prev };
@@ -176,13 +127,11 @@ export default function SettingsPage({ isDark }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File size must be less than 5MB');
       return;
     }
 
-    // Validate file type
     if (!file.type.match(/image\/(jpeg|jpg|png|gif|svg\+xml)/)) {
       toast.error('Only image files are allowed');
       return;
@@ -204,37 +153,59 @@ export default function SettingsPage({ isDark }) {
     }
   };
 
-  return (
-    <div
-      className={`min-h-screen transition-colors duration-200 ${
-        isDark ? 'bg-gray-900' : 'bg-gray-50'
-      }`}
-    >
-      {/* Header */}
-      <div
-        className={`border-b shadow-sm ${
-          isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+  const InputField = ({ label, icon: Icon, ...props }) => (
+    <div>
+      <label className={`flex items-center gap-2 text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+        {Icon && <Icon size={16} className="text-violet-500" />}
+        {label}
+      </label>
+      <input
+        {...props}
+        className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
+          isDark
+            ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-500'
+            : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400'
+        }`}
+      />
+    </div>
+  );
+
+  const SelectField = ({ label, icon: Icon, options, ...props }) => (
+    <div>
+      <label className={`flex items-center gap-2 text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+        {Icon && <Icon size={16} className="text-violet-500" />}
+        {label}
+      </label>
+      <select
+        {...props}
+        className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
+          isDark
+            ? 'border-gray-600 bg-gray-700 text-white'
+            : 'border-gray-300 bg-white text-gray-900'
         }`}
       >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
+  return (
+    <div className={`min-h-screen transition-colors duration-200 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      {/* Header */}
+      <div className={`border-b shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <div className="p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl shadow-lg">
-              <FaCog className="text-white text-2xl" />
+              <Settings className="text-white" size={24} />
             </div>
             <div>
-              <h1
-                className={`text-3xl font-bold ${
-                  isDark ? 'text-white' : 'text-gray-900'
-                }`}
-              >
+              <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 Settings
               </h1>
-              <p
-                className={`mt-1 text-sm ${
-                  isDark ? 'text-gray-400' : 'text-gray-600'
-                }`}
-              >
-                Manage school profile and system settings
+              <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Manage school profile and academic settings
               </p>
             </div>
           </div>
@@ -242,7 +213,7 @@ export default function SettingsPage({ isDark }) {
 
         {/* Tabs */}
         <div className="px-6">
-          <div className="flex gap-2 border-b" style={{ borderColor: isDark ? '#374151' : '#e5e7eb' }}>
+          <div className={`flex gap-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
             {TABS.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -259,7 +230,7 @@ export default function SettingsPage({ isDark }) {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  <Icon />
+                  <Icon size={18} />
                   {tab.label}
                 </button>
               );
@@ -268,735 +239,376 @@ export default function SettingsPage({ isDark }) {
         </div>
       </div>
 
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-6 max-w-5xl mx-auto">
         {fetchLoading ? (
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mb-4"></div>
-              <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                Loading settings...
-              </p>
+              <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>Loading settings...</p>
             </div>
           </div>
         ) : (
-          <>
+          <form onSubmit={handleSave}>
             {/* School Profile Tab */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
-                <div
-                  className={`rounded-2xl border shadow-md overflow-hidden ${
-                    isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                  }`}
-                >
-                  <div
-                    className={`p-6 border-b ${
-                      isDark
-                        ? 'border-gray-700 bg-gradient-to-r from-violet-900/20 to-purple-900/20'
-                        : 'border-gray-200 bg-gradient-to-r from-violet-50 to-purple-50'
-                    }`}
-                  >
-                    <h2
-                      className={`text-xl font-bold ${
-                        isDark ? 'text-white' : 'text-gray-900'
-                      }`}
-                    >
-                      School Profile
+                {/* Logo & Basic Info Card */}
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <div className={`p-4 border-b ${isDark ? 'border-gray-700 bg-gradient-to-r from-violet-900/20 to-purple-900/20' : 'border-gray-200 bg-gradient-to-r from-violet-50 to-purple-50'}`}>
+                    <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Basic Information
                     </h2>
                   </div>
 
-                  <form onSubmit={handleSave} className="p-6 space-y-6">
+                  <div className="p-6 space-y-6">
                     {/* Logo Upload */}
-                    <div>
-                      <label
-                        className={`block text-sm font-medium mb-3 ${
-                          isDark ? 'text-gray-300' : 'text-gray-700'
-                        }`}
-                      >
-                        School Logo
-                      </label>
-                      <div className="flex items-center gap-6">
-                        {logoPreview && (
-                          <div
-                            className={`p-4 rounded-xl border-2 ${
-                              isDark
-                                ? 'border-gray-600 bg-gray-700/50'
-                                : 'border-gray-300 bg-gray-50'
-                            }`}
-                          >
-                            <img
-                              src={logoPreview}
-                              alt="School Logo"
-                              className="h-24 w-24 object-contain rounded-lg"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                          </div>
+                    <div className="flex items-center gap-6">
+                      <div className={`w-24 h-24 rounded-xl border-2 flex items-center justify-center overflow-hidden ${isDark ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50'}`}>
+                        {logoPreview ? (
+                          <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+                        ) : (
+                          <Building2 size={32} className={isDark ? 'text-gray-500' : 'text-gray-400'} />
                         )}
-                        <div>
-                          <label
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition-all ${
-                              uploadingLogo
-                                ? 'opacity-50 cursor-not-allowed'
-                                : isDark
-                                ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
-                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
-                          >
-                            <FaUpload />
-                            {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleLogoUpload}
-                              disabled={uploadingLogo}
-                              className="hidden"
-                            />
-                          </label>
-                          <p
-                            className={`text-xs mt-2 ${
-                              isDark ? 'text-gray-400' : 'text-gray-500'
-                            }`}
-                          >
-                            Max size: 5MB. Formats: JPG, PNG, GIF, SVG
-                          </p>
-                        </div>
+                      </div>
+                      <div>
+                        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition-all ${
+                          uploadingLogo ? 'opacity-50 cursor-not-allowed' : isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}>
+                          <Upload size={16} />
+                          {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                          <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={uploadingLogo} className="hidden" />
+                        </label>
+                        <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Max 5MB (JPG, PNG, SVG)
+                        </p>
                       </div>
                     </div>
 
-                    {/* Basic Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="md:col-span-2">
-                        <label
-                          className={`flex items-center gap-2 text-sm font-medium mb-2 ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          <FaSchool className="text-violet-600" />
-                          School Name *
-                        </label>
-                        <input
+                        <InputField
+                          label="School Name *"
+                          icon={Building2}
                           type="text"
                           required
                           value={profile.name}
                           onChange={(e) => handleChange('name', e.target.value)}
                           placeholder="Enter school name"
-                          className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-500'
-                              : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400'
-                          }`}
                         />
                       </div>
 
-                      <div>
-                        <label
-                          className={`flex items-center gap-2 text-sm font-medium mb-2 ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          <FaEnvelope className="text-violet-600" />
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={profile.email}
-                          onChange={(e) => handleChange('email', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
+                      <InputField
+                        label="Email *"
+                        icon={Mail}
+                        type="email"
+                        required
+                        value={profile.email}
+                        onChange={(e) => handleChange('email', e.target.value)}
+                      />
 
-                      <div>
-                        <label
-                          className={`flex items-center gap-2 text-sm font-medium mb-2 ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          <FaPhone className="text-violet-600" />
-                          Phone
-                        </label>
-                        <input
-                          type="tel"
-                          value={profile.phone}
-                          onChange={(e) => handleChange('phone', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
+                      <InputField
+                        label="Phone"
+                        icon={Phone}
+                        type="tel"
+                        value={profile.phone || ''}
+                        onChange={(e) => handleChange('phone', e.target.value)}
+                      />
 
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Alternate Phone
-                        </label>
-                        <input
-                          type="tel"
-                          value={profile.alternatePhone || ''}
-                          onChange={(e) => handleChange('alternatePhone', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
+                      <InputField
+                        label="Website"
+                        icon={Globe}
+                        type="url"
+                        value={profile.website || ''}
+                        onChange={(e) => handleChange('website', e.target.value)}
+                        placeholder="https://www.school.com"
+                      />
 
-                      <div>
-                        <label
-                          className={`flex items-center gap-2 text-sm font-medium mb-2 ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          <FaGlobe className="text-violet-600" />
-                          Website
-                        </label>
-                        <input
-                          type="url"
-                          value={profile.website || ''}
-                          onChange={(e) => handleChange('website', e.target.value)}
-                          placeholder="https://www.school.com"
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
+                      <SelectField
+                        label="Board"
+                        icon={BookOpen}
+                        value={profile.board || 'State Board'}
+                        onChange={(e) => handleChange('board', e.target.value)}
+                        options={[
+                          { value: 'CBSE', label: 'CBSE' },
+                          { value: 'ICSE', label: 'ICSE' },
+                          { value: 'State Board', label: 'State Board' },
+                          { value: 'IB', label: 'IB' },
+                          { value: 'Cambridge', label: 'Cambridge' },
+                        ]}
+                      />
 
-                      {/* Address Fields */}
-                      <div className="md:col-span-2">
-                        <label
-                          className={`flex items-center gap-2 text-sm font-medium mb-2 ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          <FaMapMarkerAlt className="text-violet-600" />
-                          Address
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.address}
-                          onChange={(e) => handleChange('address', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
+                      <InputField
+                        label="Established Year"
+                        icon={Calendar}
+                        type="number"
+                        min="1800"
+                        max={new Date().getFullYear()}
+                        value={profile.establishedYear || ''}
+                        onChange={(e) => handleChange('establishedYear', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.city || ''}
-                          onChange={(e) => handleChange('city', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
+                {/* Address Card */}
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <div className={`p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <MapPin size={18} className="text-violet-500" />
+                      Address
+                    </h2>
+                  </div>
 
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          State
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.state || ''}
-                          onChange={(e) => handleChange('state', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Country
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.country || 'India'}
-                          onChange={(e) => handleChange('country', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Pincode
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.pincode || ''}
-                          onChange={(e) => handleChange('pincode', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-
-                      {/* Registration Details */}
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Registration Number
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.registrationNumber || ''}
-                          onChange={(e) => handleChange('registrationNumber', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Affiliation Number
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.affiliationNumber || ''}
-                          onChange={(e) => handleChange('affiliationNumber', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Board
-                        </label>
-                        <select
-                          value={profile.board || 'State Board'}
-                          onChange={(e) => handleChange('board', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        >
-                          <option value="CBSE">CBSE</option>
-                          <option value="ICSE">ICSE</option>
-                          <option value="State Board">State Board</option>
-                          <option value="IB">IB</option>
-                          <option value="Cambridge">Cambridge</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label
-                          className={`text-sm font-medium mb-2 block ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          Established Year
-                        </label>
-                        <input
-                          type="number"
-                          min="1800"
-                          max={new Date().getFullYear()}
-                          value={profile.establishedYear || ''}
-                          onChange={(e) => handleChange('establishedYear', e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-
-                      {/* Description */}
-                      <div className="md:col-span-2">
-                        <label
-                          className={`flex items-center gap-2 text-sm font-medium mb-2 ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}
-                        >
-                          <FaInfoCircle className="text-violet-600" />
-                          Description
-                        </label>
-                        <textarea
-                          value={profile.description || ''}
-                          onChange={(e) => handleChange('description', e.target.value)}
-                          placeholder="Brief description about your school..."
-                          rows={4}
-                          className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 resize-none ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-500'
-                              : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400'
-                          }`}
-                        />
-                      </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <InputField
+                        label="Street Address"
+                        type="text"
+                        value={profile.address || ''}
+                        onChange={(e) => handleChange('address', e.target.value)}
+                      />
                     </div>
 
-                    {/* Principal Info */}
-                    <div>
-                      <h3
-                        className={`text-lg font-semibold mb-4 ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
-                      >
-                        Principal Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <input
-                          type="text"
-                          placeholder="Principal Name"
-                          value={profile.principal?.name || ''}
-                          onChange={(e) => handleChange('principal.name', e.target.value)}
-                          className={`px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                        <input
-                          type="email"
-                          placeholder="Principal Email"
-                          value={profile.principal?.email || ''}
-                          onChange={(e) => handleChange('principal.email', e.target.value)}
-                          className={`px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                        <input
-                          type="tel"
-                          placeholder="Principal Phone"
-                          value={profile.principal?.phone || ''}
-                          onChange={(e) => handleChange('principal.phone', e.target.value)}
-                          className={`px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 ${
-                            isDark
-                              ? 'border-gray-600 bg-gray-700 text-white'
-                              : 'border-gray-300 bg-white text-gray-900'
-                          }`}
-                        />
-                      </div>
-                    </div>
+                    <InputField
+                      label="City"
+                      type="text"
+                      value={profile.city || ''}
+                      onChange={(e) => handleChange('city', e.target.value)}
+                    />
 
-                    {/* Info Banner */}
-                    {hasChanges && (
-                      <div
-                        className={`p-4 rounded-xl border ${
-                          isDark
-                            ? 'bg-amber-900/20 border-amber-800'
-                            : 'bg-amber-50 border-amber-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <FaInfoCircle
-                            className={isDark ? 'text-amber-400' : 'text-amber-600'}
-                          />
-                          <p
-                            className={`text-sm ${
-                              isDark ? 'text-amber-400' : 'text-amber-700'
-                            }`}
-                          >
-                            You have unsaved changes. Click "Save Settings" to apply them.
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    <InputField
+                      label="State"
+                      type="text"
+                      value={profile.state || ''}
+                      onChange={(e) => handleChange('state', e.target.value)}
+                    />
 
-                    {/* Action Buttons */}
-                    <div
-                      className={`flex justify-between items-center pt-6 border-t ${
-                        isDark ? 'border-gray-700' : 'border-gray-200'
+                    <InputField
+                      label="Country"
+                      type="text"
+                      value={profile.country || 'India'}
+                      onChange={(e) => handleChange('country', e.target.value)}
+                    />
+
+                    <InputField
+                      label="Pincode"
+                      type="text"
+                      value={profile.pincode || ''}
+                      onChange={(e) => handleChange('pincode', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Principal Card */}
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <div className={`p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <Users size={18} className="text-violet-500" />
+                      Principal Information
+                    </h2>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <InputField
+                      label="Name"
+                      type="text"
+                      value={profile.principal?.name || ''}
+                      onChange={(e) => handleChange('principal.name', e.target.value)}
+                      placeholder="Principal name"
+                    />
+
+                    <InputField
+                      label="Email"
+                      type="email"
+                      value={profile.principal?.email || ''}
+                      onChange={(e) => handleChange('principal.email', e.target.value)}
+                      placeholder="principal@school.com"
+                    />
+
+                    <InputField
+                      label="Phone"
+                      type="tel"
+                      value={profile.principal?.phone || ''}
+                      onChange={(e) => handleChange('principal.phone', e.target.value)}
+                      placeholder="+91 XXXXX XXXXX"
+                    />
+                  </div>
+                </div>
+
+                {/* Description Card */}
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <div className={`p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      About School
+                    </h2>
+                  </div>
+
+                  <div className="p-6">
+                    <textarea
+                      value={profile.description || ''}
+                      onChange={(e) => handleChange('description', e.target.value)}
+                      placeholder="Brief description about your school..."
+                      rows={4}
+                      className={`w-full px-4 py-3 border rounded-xl transition-all outline-none focus:ring-2 focus:ring-violet-500 resize-none ${
+                        isDark
+                          ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-500'
+                          : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400'
                       }`}
-                    >
-                      <div>
-                        {!hasChanges && (
-                          <div className="flex items-center gap-2">
-                            <FaCheckCircle className="text-green-500" />
-                            <span
-                              className={`text-sm ${
-                                isDark ? 'text-gray-400' : 'text-gray-600'
-                              }`}
-                            >
-                              All changes saved
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={fetch}
-                          className={`px-6 py-2.5 rounded-xl border font-medium transition-all ${
-                            isDark
-                              ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
-                              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          Reset
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={loading || !hasChanges}
-                          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loading ? (
-                            <>
-                              <svg
-                                className="animate-spin h-5 w-5 text-white"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                ></circle>
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
-                              </svg>
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <FaSave />
-                              Save Settings
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </form>
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Academic Settings Tab - Placeholder */}
+            {/* Academic Settings Tab */}
             {activeTab === 'academic' && (
-              <div
-                className={`rounded-2xl border shadow-md p-12 text-center ${
-                  isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                }`}
-              >
-                <FaGraduationCap
-                  className={`mx-auto text-5xl mb-4 ${
-                    isDark ? 'text-gray-600' : 'text-gray-400'
-                  }`}
-                />
-                <h3
-                  className={`text-lg font-medium mb-2 ${
-                    isDark ? 'text-white' : 'text-gray-900'
-                  }`}
-                >
-                  Academic Settings
-                </h3>
-                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Academic year, grading system, and attendance settings coming soon
-                </p>
+              <div className="space-y-6">
+                {/* Academic Year Card */}
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <div className={`p-4 border-b ${isDark ? 'border-gray-700 bg-gradient-to-r from-violet-900/20 to-purple-900/20' : 'border-gray-200 bg-gradient-to-r from-violet-50 to-purple-50'}`}>
+                    <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <Calendar size={18} className="text-violet-500" />
+                      Current Academic Year
+                    </h2>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <InputField
+                        label="Academic Year"
+                        icon={Calendar}
+                        type="text"
+                        value={profile.currentAcademicYear || ''}
+                        onChange={(e) => handleChange('currentAcademicYear', e.target.value)}
+                        placeholder="2024-2025"
+                      />
+                    </div>
+                    <p className={`text-sm mt-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Format: YYYY-YYYY (e.g., 2024-2025)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grading & Attendance Card */}
+                <div className={`rounded-2xl border shadow-md overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <div className={`p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <Percent size={18} className="text-violet-500" />
+                      Grading & Attendance Rules
+                    </h2>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className={`flex items-center gap-2 text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Percent size={16} className="text-violet-500" />
+                        Passing Percentage
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="20"
+                          max="60"
+                          value={profile.passingPercentage || 33}
+                          onChange={(e) => handleChange('passingPercentage', parseInt(e.target.value))}
+                          className="flex-1 h-2 rounded-full appearance-none cursor-pointer accent-violet-600"
+                          style={{ background: isDark ? '#374151' : '#e5e7eb' }}
+                        />
+                        <span className={`w-12 text-center font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          {profile.passingPercentage || 33}%
+                        </span>
+                      </div>
+                      <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        Minimum percentage required to pass exams
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={`flex items-center gap-2 text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <Clock size={16} className="text-violet-500" />
+                        Attendance Required
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="50"
+                          max="90"
+                          value={profile.attendancePercentageRequired || 75}
+                          onChange={(e) => handleChange('attendancePercentageRequired', parseInt(e.target.value))}
+                          className="flex-1 h-2 rounded-full appearance-none cursor-pointer accent-violet-600"
+                          style={{ background: isDark ? '#374151' : '#e5e7eb' }}
+                        />
+                        <span className={`w-12 text-center font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          {profile.attendancePercentageRequired || 75}%
+                        </span>
+                      </div>
+                      <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        Minimum attendance required to sit for exams
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Info Card */}
+                <div className={`rounded-xl p-4 ${isDark ? 'bg-violet-900/20 border border-violet-800' : 'bg-violet-50 border border-violet-200'}`}>
+                  <p className={`text-sm ${isDark ? 'text-violet-300' : 'text-violet-700'}`}>
+                    💡 <strong>Tip:</strong> These settings affect how grades and attendance are calculated across the system.
+                    Students below the attendance threshold may be flagged for exam eligibility.
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* System Settings Tab - Placeholder */}
-            {activeTab === 'system' && (
-              <div
-                className={`rounded-2xl border shadow-md p-12 text-center ${
-                  isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                }`}
-              >
-                <FaCog
-                  className={`mx-auto text-5xl mb-4 ${
-                    isDark ? 'text-gray-600' : 'text-gray-400'
-                  }`}
-                />
-                <h3
-                  className={`text-lg font-medium mb-2 ${
-                    isDark ? 'text-white' : 'text-gray-900'
-                  }`}
-                >
-                  System Settings
-                </h3>
-                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Date format, timezone, security, and notification settings coming soon
-                </p>
-              </div>
-            )}
-
-            {/* Statistics Tab */}
-            {activeTab === 'statistics' && (
-              <div
-                className={`rounded-2xl border shadow-md overflow-hidden ${
-                  isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                }`}
-              >
-                <div
-                  className={`p-6 border-b ${
-                    isDark ? 'border-gray-700' : 'border-gray-200'
-                  }`}
-                >
-                  <h2
-                    className={`text-xl font-bold ${
-                      isDark ? 'text-white' : 'text-gray-900'
+            {/* Save Button - Fixed at bottom */}
+            <div className={`sticky bottom-6 mt-8 p-4 rounded-2xl border shadow-lg ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  {hasChanges ? (
+                    <p className={`text-sm flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                      Unsaved changes
+                    </p>
+                  ) : (
+                    <p className={`text-sm flex items-center gap-2 ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                      <CheckCircle size={16} />
+                      All changes saved
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={fetchProfile}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-medium transition-all ${
+                      isDark
+                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    School Statistics
-                  </h2>
+                    <RotateCcw size={16} />
+                    Reset
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || !hasChanges}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        Save Settings
+                      </>
+                    )}
+                  </button>
                 </div>
-                {statistics ? (
-                  <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div
-                      className={`p-6 rounded-xl text-center ${
-                        isDark ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div
-                        className={`text-3xl font-bold mb-2 ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
-                      >
-                        {statistics.totalAcademicYears}
-                      </div>
-                      <div
-                        className={`text-sm ${
-                          isDark ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        Academic Years
-                      </div>
-                    </div>
-                    <div
-                      className={`p-6 rounded-xl text-center ${
-                        isDark ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div
-                        className={`text-3xl font-bold mb-2 ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
-                      >
-                        {statistics.workingDays}
-                      </div>
-                      <div
-                        className={`text-sm ${
-                          isDark ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        Working Days/Week
-                      </div>
-                    </div>
-                    <div
-                      className={`p-6 rounded-xl text-center ${
-                        isDark ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div
-                        className={`text-3xl font-bold mb-2 ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
-                      >
-                        {statistics.totalGrades}
-                      </div>
-                      <div
-                        className={`text-sm ${
-                          isDark ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        Grading Levels
-                      </div>
-                    </div>
-                    <div
-                      className={`p-6 rounded-xl text-center ${
-                        isDark ? 'bg-gray-700' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div
-                        className={`text-3xl font-bold mb-2 ${
-                          statistics.subscriptionStatus === 'active'
-                            ? 'text-green-500'
-                            : 'text-red-500'
-                        }`}
-                      >
-                        {statistics.subscriptionStatus}
-                      </div>
-                      <div
-                        className={`text-sm ${
-                          isDark ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        Subscription
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
-                  </div>
-                )}
               </div>
-            )}
-          </>
+            </div>
+          </form>
         )}
       </div>
     </div>

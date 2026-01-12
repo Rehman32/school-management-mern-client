@@ -14,6 +14,7 @@ import FeesManagement from "./pages/admin/FeesManagement";
 import AcademicsManagement from "./pages/admin/AcademicsManagement";
 import TimetableManagement from "./pages/admin/TimetableManagement";
 import SettingsPage from "./pages/admin/SettingsPage";
+import ProfilePage from "./pages/admin/ProfilePage";
 
 // Auth Routes
 import VerifyEmail from "./pages/auth/VerifyEmail";
@@ -134,6 +135,16 @@ function App() {
               <ProtectedRoute>
                 <AdminDashboard>
                   <SettingsPage />
+                </AdminDashboard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/profile"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard>
+                  <ProfilePage />
                 </AdminDashboard>
               </ProtectedRoute>
             }

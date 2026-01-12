@@ -1,80 +1,97 @@
 // ============================================
-// SCHOOL REGISTRATION PAGE
-// Register new school (tenant) with admin
+// SCHOOL REGISTRATION PAGE - INDUSTRY GRADE
+// Clean, modern school onboarding flow
 // ============================================
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from '../../utils/axiosInstance';
+import { registerSchool } from '../../api/authApi';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { FaSchool, FaUser, FaEnvelope, FaLock, FaPhone, FaGlobe, FaCheck } from 'react-icons/fa';
+import { 
+  FaSchool, FaUser, FaEnvelope, FaLock, FaPhone, 
+  FaMapMarkerAlt, FaCity, FaGlobe, FaArrowRight, 
+  FaArrowLeft, FaCheck, FaGraduationCap
+} from 'react-icons/fa';
+import './SchoolRegister.css';
 
-export default function SchoolRegister() {
+const SchoolRegister = () => {
+  const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
+  
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  
   const [formData, setFormData] = useState({
     // School Info
     schoolName: '',
     schoolEmail: '',
-    phone: '',
-    subdomain: '',
+    schoolPhone: '',
+    schoolAddress: '',
+    city: '',
+    state: '',
+    country: 'Pakistan',
+    board: 'State Board',
     
     // Admin Info
     adminName: '',
     adminEmail: '',
     adminPassword: '',
-    confirmPassword: '',
-    
-    // Terms
-    acceptTerms: false,
+    confirmPassword: ''
   });
 
-  const navigate = useNavigate();
-
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
-    });
-  };
-
-  const handleSubdomainChange = (e) => {
-    // Only allow lowercase letters, numbers, and hyphens
-    const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    setFormData({ ...formData, subdomain: value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error when field changes
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const validateStep1 = () => {
-    if (!formData.schoolName || !formData.schoolEmail) {
-      toast.error('Please fill all school details');
-      return false;
+    const newErrors = {};
+    
+    if (!formData.schoolName.trim()) {
+      newErrors.schoolName = 'School name is required';
     }
-    return true;
+    if (!formData.schoolEmail.trim()) {
+      newErrors.schoolEmail = 'School email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.schoolEmail)) {
+      newErrors.schoolEmail = 'Invalid email format';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = () => {
-    if (!formData.adminName || !formData.adminEmail || !formData.adminPassword) {
-      toast.error('Please fill all admin details');
-      return false;
+    const newErrors = {};
+    
+    if (!formData.adminName.trim()) {
+      newErrors.adminName = 'Your name is required';
     }
-    if (formData.adminPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return false;
+    if (!formData.adminEmail.trim()) {
+      newErrors.adminEmail = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) {
+      newErrors.adminEmail = 'Invalid email format';
+    }
+    if (!formData.adminPassword) {
+      newErrors.adminPassword = 'Password is required';
+    } else if (formData.adminPassword.length < 8) {
+      newErrors.adminPassword = 'Password must be at least 8 characters';
     }
     if (formData.adminPassword !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return false;
+      newErrors.confirmPassword = 'Passwords do not match';
     }
-    if (!formData.acceptTerms) {
-      toast.error('Please accept terms and conditions');
-      return false;
-    }
-    return true;
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
-    if (validateStep1()) {
+    if (step === 1 && validateStep1()) {
       setStep(2);
     }
   };
@@ -85,323 +102,291 @@ export default function SchoolRegister() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    
     if (!validateStep2()) return;
-
+    
     setLoading(true);
-
+    
     try {
-      const response = await axios.post('/tenants/register', {
+      const result = await registerSchool({
         schoolName: formData.schoolName,
         schoolEmail: formData.schoolEmail,
-        phone: formData.phone,
-        subdomain: formData.subdomain || null,
+        schoolPhone: formData.schoolPhone,
+        schoolAddress: formData.schoolAddress,
+        city: formData.city,
+        state: formData.state,
+        country: formData.country,
+        board: formData.board,
         adminName: formData.adminName,
         adminEmail: formData.adminEmail,
-        adminPassword: formData.adminPassword,
+        adminPassword: formData.adminPassword
       });
-
-      toast.success('School registered successfully! Please verify your email.');
       
-      // Redirect to verification page or login
-      navigate('/verify-email', { 
-        state: { email: formData.adminEmail } 
-      });
-    } catch (error) {
-      console.error('Registration error:', error);
-      const errorMsg = error.response?.data?.message || 
-                      error.response?.data?.msg || 
-                      'Registration failed';
-      toast.error(errorMsg);
+      // Store token and login
+      if (result.data?.accessToken) {
+        localStorage.setItem('token', result.data.accessToken);
+        if (authLogin) {
+          authLogin(result.data);
+        }
+      }
+      
+      toast.success('School registered successfully! Welcome aboard!');
+      navigate('/admin/dashboard');
+      
+    } catch (err) {
+      const message = err.response?.data?.message || 'Registration failed. Please try again.';
+      toast.error(message);
+      setErrors({ submit: message });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <FaSchool className="text-white text-2xl" />
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900">Register Your School</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Start managing your school with our comprehensive system
-          </p>
-        </div>
-
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-center">
-            <div className="flex items-center space-x-4">
-              {/* Step 1 */}
-              <div className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {step > 1 ? <FaCheck /> : '1'}
-                </div>
-                <span className={`ml-2 text-sm font-medium ${
-                  step >= 1 ? 'text-gray-900' : 'text-gray-500'
-                }`}>
-                  School Info
-                </span>
+    <div className="school-register-page">
+      <div className="register-container">
+        {/* Left side - Branding */}
+        <div className="branding-section">
+          <div className="brand-content">
+            <FaGraduationCap className="brand-icon" />
+            <h1>School Management System</h1>
+            <p>Set up your school's digital management platform in minutes</p>
+            
+            <div className="features-list">
+              <div className="feature-item">
+                <FaCheck /> Student & Teacher Management
               </div>
-
-              {/* Divider */}
-              <div className={`w-12 h-1 ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-
-              {/* Step 2 */}
-              <div className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  2
-                </div>
-                <span className={`ml-2 text-sm font-medium ${
-                  step >= 2 ? 'text-gray-900' : 'text-gray-500'
-                }`}>
-                  Admin Account
-                </span>
+              <div className="feature-item">
+                <FaCheck /> Attendance & Fee Tracking
+              </div>
+              <div className="feature-item">
+                <FaCheck /> Exams & Report Cards
+              </div>
+              <div className="feature-item">
+                <FaCheck /> Timetable Management
               </div>
             </div>
           </div>
         </div>
 
-        {/* Form Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <form onSubmit={handleSubmit}>
-            {/* Step 1: School Information */}
+        {/* Right side - Form */}
+        <div className="form-section">
+          <div className="form-header">
+            <h2>Register Your School</h2>
+            <p>Step {step} of 2 - {step === 1 ? 'School Information' : 'Admin Account'}</p>
+            
+            {/* Progress bar */}
+            <div className="progress-bar">
+              <div className={`progress-step ${step >= 1 ? 'active' : ''}`}>1</div>
+              <div className={`progress-line ${step >= 2 ? 'active' : ''}`}></div>
+              <div className={`progress-step ${step >= 2 ? 'active' : ''}`}>2</div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="register-form">
+            {errors.submit && (
+              <div className="error-banner">{errors.submit}</div>
+            )}
+
+            {/* Step 1: School Info */}
             {step === 1 && (
-              <div className="space-y-5">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">School Information</h3>
-
-                {/* School Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    School Name *
+              <div className="form-step">
+                <div className="input-group">
+                  <label>
+                    <FaSchool /> School Name *
                   </label>
-                  <div className="relative">
-                    <FaSchool className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      name="schoolName"
-                      value={formData.schoolName}
-                      onChange={handleChange}
-                      placeholder="e.g., ABC High School"
-                      required
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    name="schoolName"
+                    value={formData.schoolName}
+                    onChange={handleChange}
+                    placeholder="e.g., Springfield High School"
+                    className={errors.schoolName ? 'error' : ''}
+                  />
+                  {errors.schoolName && <span className="error-text">{errors.schoolName}</span>}
                 </div>
 
-                {/* School Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    School Email *
+                <div className="input-group">
+                  <label>
+                    <FaEnvelope /> School Email *
                   </label>
-                  <div className="relative">
-                    <FaEnvelope className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email"
-                      name="schoolEmail"
-                      value={formData.schoolEmail}
-                      onChange={handleChange}
-                      placeholder="info@abcschool.com"
-                      required
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
+                  <input
+                    type="email"
+                    name="schoolEmail"
+                    value={formData.schoolEmail}
+                    onChange={handleChange}
+                    placeholder="info@yourschool.edu"
+                    className={errors.schoolEmail ? 'error' : ''}
+                  />
+                  {errors.schoolEmail && <span className="error-text">{errors.schoolEmail}</span>}
                 </div>
 
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
-                  <div className="relative">
-                    <FaPhone className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>
+                      <FaPhone /> Phone
+                    </label>
                     <input
                       type="tel"
-                      name="phone"
-                      value={formData.phone}
+                      name="schoolPhone"
+                      value={formData.schoolPhone}
                       onChange={handleChange}
                       placeholder="+92 300 1234567"
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     />
+                  </div>
+
+                  <div className="input-group">
+                    <label>
+                      <FaGlobe /> Board
+                    </label>
+                    <select
+                      name="board"
+                      value={formData.board}
+                      onChange={handleChange}
+                    >
+                      <option value="State Board">State Board</option>
+                      <option value="CBSE">CBSE</option>
+                      <option value="ICSE">ICSE</option>
+                      <option value="Cambridge">Cambridge</option>
+                      <option value="IB">IB</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* Subdomain */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subdomain (Optional)
+                <div className="input-group">
+                  <label>
+                    <FaMapMarkerAlt /> Address
                   </label>
-                  <div className="relative">
-                    <FaGlobe className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    name="schoolAddress"
+                    value={formData.schoolAddress}
+                    onChange={handleChange}
+                    placeholder="Street address"
+                  />
+                </div>
+
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>
+                      <FaCity /> City
+                    </label>
                     <input
                       type="text"
-                      name="subdomain"
-                      value={formData.subdomain}
-                      onChange={handleSubdomainChange}
-                      placeholder="abc-school"
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      placeholder="City"
                     />
                   </div>
-                  {formData.subdomain && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Your school URL: <span className="font-medium text-blue-600">
-                        {formData.subdomain}.yourschool.com
-                      </span>
-                    </p>
-                  )}
+
+                  <div className="input-group">
+                    <label>State/Province</label>
+                    <input
+                      type="text"
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      placeholder="State"
+                    />
+                  </div>
                 </div>
 
-                {/* Next Button */}
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
-                >
-                  Continue
+                <button type="button" className="btn-next" onClick={handleNext}>
+                  Next Step <FaArrowRight />
                 </button>
               </div>
             )}
 
             {/* Step 2: Admin Account */}
             {step === 2 && (
-              <div className="space-y-5">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Create Admin Account</h3>
-
-                {/* Admin Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Admin Full Name *
-                  </label>
-                  <div className="relative">
-                    <FaUser className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      name="adminName"
-                      value={formData.adminName}
-                      onChange={handleChange}
-                      placeholder="John Doe"
-                      required
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
+              <div className="form-step">
+                <div className="step-intro">
+                  <p>Create your administrator account to manage <strong>{formData.schoolName}</strong></p>
                 </div>
 
-                {/* Admin Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Admin Email *
+                <div className="input-group">
+                  <label>
+                    <FaUser /> Your Full Name *
                   </label>
-                  <div className="relative">
-                    <FaEnvelope className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email"
-                      name="adminEmail"
-                      value={formData.adminEmail}
-                      onChange={handleChange}
-                      placeholder="admin@abcschool.com"
-                      required
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password *
-                  </label>
-                  <div className="relative">
-                    <FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="password"
-                      name="adminPassword"
-                      value={formData.adminPassword}
-                      onChange={handleChange}
-                      placeholder="Min. 8 characters"
-                      required
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Confirm Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password *
-                  </label>
-                  <div className="relative">
-                    <FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      placeholder="Re-enter password"
-                      required
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Terms */}
-                <div className="flex items-start">
                   <input
-                    type="checkbox"
-                    name="acceptTerms"
-                    checked={formData.acceptTerms}
+                    type="text"
+                    name="adminName"
+                    value={formData.adminName}
                     onChange={handleChange}
-                    className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                    placeholder="e.g., John Doe"
+                    className={errors.adminName ? 'error' : ''}
                   />
-                  <label className="ml-2 text-sm text-gray-700">
-                    I agree to the{' '}
-                    <Link to="/terms" className="text-blue-600 hover:underline">
-                      Terms of Service
-                    </Link>{' '}
-                    and{' '}
-                    <Link to="/privacy" className="text-blue-600 hover:underline">
-                      Privacy Policy
-                    </Link>
-                  </label>
+                  {errors.adminName && <span className="error-text">{errors.adminName}</span>}
                 </div>
 
-                {/* Buttons */}
-                <div className="flex space-x-4">
-                  <button
-                    type="button"
-                    onClick={handleBack}
-                    className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200"
-                  >
-                    Back
+                <div className="input-group">
+                  <label>
+                    <FaEnvelope /> Your Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="adminEmail"
+                    value={formData.adminEmail}
+                    onChange={handleChange}
+                    placeholder="admin@yourschool.edu"
+                    className={errors.adminEmail ? 'error' : ''}
+                  />
+                  {errors.adminEmail && <span className="error-text">{errors.adminEmail}</span>}
+                </div>
+
+                <div className="input-group">
+                  <label>
+                    <FaLock /> Password *
+                  </label>
+                  <input
+                    type="password"
+                    name="adminPassword"
+                    value={formData.adminPassword}
+                    onChange={handleChange}
+                    placeholder="Min 8 characters"
+                    className={errors.adminPassword ? 'error' : ''}
+                  />
+                  {errors.adminPassword && <span className="error-text">{errors.adminPassword}</span>}
+                </div>
+
+                <div className="input-group">
+                  <label>
+                    <FaLock /> Confirm Password *
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Confirm your password"
+                    className={errors.confirmPassword ? 'error' : ''}
+                  />
+                  {errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
+                </div>
+
+                <div className="button-row">
+                  <button type="button" className="btn-back" onClick={handleBack}>
+                    <FaArrowLeft /> Back
                   </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 disabled:opacity-50"
-                  >
-                    {loading ? 'Registering...' : 'Complete Registration'}
+                  <button type="submit" className="btn-submit" disabled={loading}>
+                    {loading ? 'Creating...' : 'Create School Account'}
                   </button>
                 </div>
               </div>
             )}
           </form>
-        </div>
 
-        {/* Login Link */}
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-            Sign in
-          </Link>
-        </p>
+          <div className="form-footer">
+            <p>
+              Already have an account? <Link to="/login">Login here</Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default SchoolRegister;

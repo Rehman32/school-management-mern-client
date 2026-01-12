@@ -219,10 +219,10 @@ export default function Login() {
         <p className="mt-6 text-center text-sm text-gray-600">
           Don't have an account?{" "}
           <Link
-            to="/register"
+            to="/register-school"
             className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
           >
-            Create an account
+            Register your school
           </Link>
         </p>
       </div>

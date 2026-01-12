@@ -19,6 +19,8 @@ import SettingsPage from "./pages/admin/SettingsPage";
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
+import SchoolRegister from "./pages/auth/SchoolRegister";
+import AcceptInvitation from "./pages/auth/AcceptInvitation";
 
 function App() {
   return (
@@ -29,6 +31,8 @@ function App() {
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/register-school" element={<SchoolRegister />} />
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
           
           {/* Auth Routes */}
           <Route path="/verify-email" element={<VerifyEmail />} />

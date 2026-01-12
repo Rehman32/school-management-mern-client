@@ -1,10 +1,14 @@
-import axios from '../utils/axiosInstance';
-import React, { useState } from "react";
+// ============================================
+// LOGIN PAGE - INDUSTRY GRADE
+// Clean, professional login experience
+// ============================================
+
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import toast from 'react-hot-toast';
 import { Link } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaEnvelope, FaLock } from 'react-icons/fa';
-import { FcGoogle } from 'react-icons/fc';
+import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaGraduationCap } from 'react-icons/fa';
+import axios from '../utils/axiosInstance';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -13,41 +17,45 @@ export default function Login() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.email || !formData.password) {
+      toast.error('Please enter email and password');
+      return;
+    }
+    
     setIsLoading(true);
 
-    console.log('🔍 Frontend: Attempting login with:', formData.email); // DEBUG
-
     try {
-      // Make sure we're sending the data correctly
       const response = await axios.post('/auth/login', {
-        email: formData.email.trim(), // Remove whitespace
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
       });
 
-      console.log('✅ Frontend: Login response:', response.data); // DEBUG
-
       // Extract token from response
-      const token = response.data?.data?.accessToken || response.data?.accessToken || response.data?.token;
+      const token = response.data?.data?.accessToken || response.data?.accessToken;
 
       if (!token) {
-        console.error('❌ Frontend: No token in response:', response.data);
-        toast.error('Login failed: No token received');
+        toast.error('Login failed: Invalid response');
         return;
       }
 
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('rememberEmail', formData.email);
+      } else {
+        localStorage.removeItem('rememberEmail');
+      }
+
       login(token);
-      toast.success("Login Successful");
-    } catch (error) {
-      console.error('❌ Frontend: Login error:', error);
-      console.error('Response data:', error.response?.data);
+      toast.success("Welcome back!");
       
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.msg || 
-                          'Login Failed';
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Invalid email or password';
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -58,50 +66,39 @@ export default function Login() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Load remembered email on mount
+  useState(() => {
+    const rememberedEmail = localStorage.getItem('rememberEmail');
+    if (rememberedEmail) {
+      setFormData(prev => ({ ...prev, email: rememberedEmail }));
+      setRememberMe(true);
+    }
+  }, []);
+
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-white text-2xl font-bold">L</span>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mb-6 shadow-2xl shadow-purple-500/30">
+            <FaGraduationCap className="text-white text-4xl" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Welcome back</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Please enter your details to sign in
+          <h1 className="text-3xl font-bold text-white mb-2">School Management</h1>
+          <p className="text-gray-400">
+            Sign in to your account
           </p>
         </div>
 
         {/* Main Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6 border border-gray-100">
-          {/* Social Login */}
-          <button
-            type="button"
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-medium text-gray-700"
-          >
-            <FcGoogle className="text-xl" />
-            Continue with Google
-          </button>
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-gray-500">Or continue with email</span>
-            </div>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-white/20">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Input */}
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-gray-300 mb-2"
               >
-                Email address
+                Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -113,10 +110,10 @@ export default function Login() {
                   type="email"
                   onChange={handleChange}
                   value={formData.email}
-                  placeholder="Enter your email"
+                  placeholder="admin@school.com"
                   required
                   autoComplete="email"
-                  className="block w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 outline-none text-gray-900 placeholder-gray-400"
+                  className="block w-full pl-11 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 outline-none text-white placeholder-gray-500"
                 />
               </div>
             </div>
@@ -125,7 +122,7 @@ export default function Login() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-gray-300 mb-2"
               >
                 Password
               </label>
@@ -137,17 +134,17 @@ export default function Login() {
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder="••••••••"
                   onChange={handleChange}
                   value={formData.password}
                   required
                   autoComplete="current-password"
-                  className="block w-full pl-11 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 outline-none text-gray-900 placeholder-gray-400"
+                  className="block w-full pl-11 pr-12 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 outline-none text-white placeholder-gray-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white transition-colors"
                 >
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </button>
@@ -161,18 +158,20 @@ export default function Login() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-white/5 cursor-pointer"
                 />
                 <label
                   htmlFor="remember-me"
-                  className="ml-2 block text-sm text-gray-700 cursor-pointer"
+                  className="ml-2 block text-sm text-gray-400 cursor-pointer hover:text-gray-300"
                 >
                   Remember me
                 </label>
               </div>
               <Link
                 to="/forgot-password"
-                className="text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors"
               >
                 Forgot password?
               </Link>
@@ -182,7 +181,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-md text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
             >
               {isLoading ? (
                 <>
@@ -209,21 +208,26 @@ export default function Login() {
                   Signing in...
                 </>
               ) : (
-                "Sign in"
+                "Sign In"
               )}
             </button>
           </form>
         </div>
 
         {/* Register Link */}
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Don't have an account?{" "}
+        <p className="mt-8 text-center text-sm text-gray-400">
+          New to School Management?{" "}
           <Link
             to="/register-school"
-            className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+            className="font-semibold text-purple-400 hover:text-purple-300 transition-colors"
           >
             Register your school
           </Link>
+        </p>
+
+        {/* Footer */}
+        <p className="mt-6 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} School Management System. All rights reserved.
         </p>
       </div>
     </div>

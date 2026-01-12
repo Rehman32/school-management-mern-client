@@ -1,5 +1,6 @@
 // studentManagement.jsx
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getAllStudents,
   createStudent,
@@ -17,6 +18,7 @@ import {
   FaTimes,
   FaEdit,
   FaTrash,
+  FaEye,
   FaSave,
   FaSearch,
   FaFilter,
@@ -50,6 +52,7 @@ const STATUS_OPTIONS = [
 
 export default function StudentManagement({ isDark }) {
   const { role } = useAuth();
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -912,6 +915,17 @@ export default function StudentManagement({ isDark }) {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="inline-flex gap-2">
+                            <button
+                              onClick={() => navigate(`/admin/students/${student._id}`)}
+                              className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                                isDark
+                                  ? "text-purple-400 hover:bg-purple-900/20"
+                                  : "text-purple-600 hover:bg-purple-50"
+                              }`}
+                            >
+                              <FaEye />
+                              View
+                            </button>
                             <button
                               onClick={() => handleEdit(student)}
                               className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${

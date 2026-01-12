@@ -15,6 +15,8 @@ import AcademicsManagement from "./pages/admin/AcademicsManagement";
 import TimetableManagement from "./pages/admin/TimetableManagement";
 import SettingsPage from "./pages/admin/SettingsPage";
 import ProfilePage from "./pages/admin/ProfilePage";
+import StudentProfile from "./pages/admin/StudentProfile";
+import TeacherProfile from "./pages/admin/TeacherProfile";
 
 // Auth Routes
 import VerifyEmail from "./pages/auth/VerifyEmail";
@@ -145,6 +147,26 @@ function App() {
               <ProtectedRoute>
                 <AdminDashboard>
                   <ProfilePage />
+                </AdminDashboard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/students/:id"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard>
+                  <StudentProfile />
+                </AdminDashboard>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/teachers/:id"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard>
+                  <TeacherProfile />
                 </AdminDashboard>
               </ProtectedRoute>
             }

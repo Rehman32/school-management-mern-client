@@ -4,6 +4,7 @@
 // ============================================
 
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   listTeachers,
   createTeacher,
@@ -69,6 +70,7 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function TeacherManagement({ isDark }) {
   const { role } = useAuth();
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -217,18 +219,8 @@ export default function TeacherManagement({ isDark }) {
     }
   };
 
-  const handleViewTeacher = async (id) => {
-    try {
-      setLoading(true);
-      const res = await getTeacherById(id);
-      setViewingTeacher(res.data.data);
-      setShowViewModal(true);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load teacher details");
-    } finally {
-      setLoading(false);
-    }
+  const handleViewTeacher = (id) => {
+    navigate(`/admin/teachers/${id}`);
   };
 
   const handleSubmit = async (e) => {

@@ -1,7 +1,7 @@
 // ============================================
-// STUDENT PROFILE PAGE
+// STUDENT PROFILE PAGE - ENHANCED
 // client/src/pages/admin/StudentProfile.jsx
-// Comprehensive student view with tabs
+// Comprehensive student view with functional tabs
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -25,9 +25,17 @@ import {
   Trash2,
   Upload,
   Download,
-  Eye
+  Eye,
+  Printer,
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import { getStudentById, uploadStudentPhoto, deleteStudentPhoto, getStudentDocuments, uploadStudentDocument, deleteStudentDocument } from '../../api/studentApi';
+import { getStudentFees } from '../../api/feesApi';
+import { getStudentGrades } from '../../api/examApi';
+import ReceiptModal from '../../components/admin/fees/ReceiptModal';
+import ReportCardModal from '../../components/admin/academics/ReportCardModal';
 
 const StudentProfile = ({ isDark }) => {
   const { id } = useParams();
@@ -39,6 +47,17 @@ const StudentProfile = ({ isDark }) => {
   const [documents, setDocuments] = useState([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  
+  // Fees state
+  const [fees, setFees] = useState([]);
+  const [feesLoading, setFeesLoading] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  
+  // Grades state
+  const [grades, setGrades] = useState([]);
+  const [gradesLoading, setGradesLoading] = useState(false);
+  const [showReportCard, setShowReportCard] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -46,6 +65,15 @@ const StudentProfile = ({ isDark }) => {
       fetchDocuments();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (activeTab === 'fees' && id) {
+      fetchFees();
+    }
+    if (activeTab === 'grades' && id) {
+      fetchGrades();
+    }
+  }, [activeTab, id]);
 
   const fetchStudent = async () => {
     try {
@@ -66,6 +94,30 @@ const StudentProfile = ({ isDark }) => {
       setDocuments(res.data?.data || []);
     } catch (err) {
       console.error('Failed to load documents:', err);
+    }
+  };
+
+  const fetchFees = async () => {
+    setFeesLoading(true);
+    try {
+      const res = await getStudentFees(id);
+      setFees(res.data || []);
+    } catch (err) {
+      console.error('Failed to load fees:', err);
+    } finally {
+      setFeesLoading(false);
+    }
+  };
+
+  const fetchGrades = async () => {
+    setGradesLoading(true);
+    try {
+      const res = await getStudentGrades(id);
+      setGrades(res || []);
+    } catch (err) {
+      console.error('Failed to load grades:', err);
+    } finally {
+      setGradesLoading(false);
     }
   };
 
@@ -138,6 +190,11 @@ const StudentProfile = ({ isDark }) => {
     }
   };
 
+  const handleViewReceipt = (fee) => {
+    setSelectedReceipt({ ...fee, student });
+    setShowReceiptModal(true);
+  };
+
   const tabs = [
     { id: 'info', label: 'Information', icon: User },
     { id: 'attendance', label: 'Attendance', icon: ClipboardList },
@@ -153,6 +210,30 @@ const StudentProfile = ({ isDark }) => {
       month: 'short',
       year: 'numeric'
     });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0
+    }).format(amount || 0);
+  };
+
+  const getStatusBadge = (status) => {
+    const config = {
+      paid: { color: 'bg-green-100 text-green-700', icon: CheckCircle },
+      pending: { color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
+      overdue: { color: 'bg-red-100 text-red-700', icon: XCircle },
+      partial: { color: 'bg-blue-100 text-blue-700', icon: AlertCircle }
+    };
+    const { color, icon: Icon } = config[status?.toLowerCase()] || config.pending;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+        <Icon size={12} />
+        {status}
+      </span>
+    );
   };
 
   if (loading) {
@@ -400,27 +481,140 @@ const StudentProfile = ({ isDark }) => {
 
         {/* Fees Tab */}
         {activeTab === 'fees' && (
-          <div className="text-center py-12">
-            <CreditCard size={48} className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
-            <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Fee Payment History
-            </h3>
-            <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-              Fee records and payment history will be displayed here
-            </p>
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                Fee Payment History
+              </h3>
+            </div>
+
+            {feesLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : fees.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className={isDark ? 'bg-gray-700' : 'bg-gray-50'}>
+                      <th className={`p-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Fee Type</th>
+                      <th className={`p-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Amount</th>
+                      <th className={`p-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Due Date</th>
+                      <th className={`p-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Status</th>
+                      <th className={`p-3 text-right text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    {fees.map((fee) => (
+                      <tr key={fee._id} className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={`p-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>{fee.feeType}</td>
+                        <td className={`p-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(fee.amount)}</td>
+                        <td className={`p-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{formatDate(fee.dueDate)}</td>
+                        <td className="p-3">{getStatusBadge(fee.status)}</td>
+                        <td className="p-3 text-right">
+                          {fee.status?.toLowerCase() === 'paid' && (
+                            <button
+                              onClick={() => handleViewReceipt(fee)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                            >
+                              <Printer size={16} />
+                              Receipt
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <CreditCard size={48} className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
+                <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No fee records found</p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Grades Tab */}
         {activeTab === 'grades' && (
-          <div className="text-center py-12">
-            <Award size={48} className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
-            <h3 className={`text-lg font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Academic Performance
-            </h3>
-            <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-              Exam results and report cards will be displayed here
-            </p>
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                Academic Performance
+              </h3>
+              {grades.length > 0 && (
+                <button
+                  onClick={() => setShowReportCard(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all"
+                >
+                  <Printer size={18} />
+                  Print Report Card
+                </button>
+              )}
+            </div>
+
+            {gradesLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            ) : grades.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className={isDark ? 'bg-gray-700' : 'bg-gray-50'}>
+                      <th className={`p-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Exam</th>
+                      <th className={`p-3 text-left text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Subject</th>
+                      <th className={`p-3 text-center text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Marks</th>
+                      <th className={`p-3 text-center text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    {grades.map((grade, index) => {
+                      const percentage = grade.maxMarks > 0 ? ((grade.marksObtained / grade.maxMarks) * 100) : 0;
+                      let gradeLabel = 'F';
+                      if (percentage >= 90) gradeLabel = 'A+';
+                      else if (percentage >= 80) gradeLabel = 'A';
+                      else if (percentage >= 70) gradeLabel = 'B+';
+                      else if (percentage >= 60) gradeLabel = 'B';
+                      else if (percentage >= 50) gradeLabel = 'C';
+                      else if (percentage >= 40) gradeLabel = 'D';
+                      
+                      return (
+                        <tr key={index} className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                          <td className={`p-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {grade.exam?.name || 'Exam'}
+                          </td>
+                          <td className={`p-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {grade.subject?.name || grade.subjectName || 'Subject'}
+                          </td>
+                          <td className={`p-3 text-center ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            <span className={percentage < 40 ? 'text-red-500' : 'text-green-500'}>
+                              {grade.marksObtained}
+                            </span>
+                            <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>/{grade.maxMarks}</span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                              gradeLabel === 'F' 
+                                ? 'bg-red-100 text-red-600' 
+                                : 'bg-green-100 text-green-600'
+                            }`}>
+                              {gradeLabel}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Award size={48} className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
+                <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No exam results found</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -469,6 +663,23 @@ const StudentProfile = ({ isDark }) => {
           </div>
         )}
       </div>
+
+      {/* Receipt Modal */}
+      <ReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        receipt={selectedReceipt}
+        isDark={isDark}
+      />
+
+      {/* Report Card Modal */}
+      <ReportCardModal
+        isOpen={showReportCard}
+        onClose={() => setShowReportCard(false)}
+        student={student}
+        examResults={grades}
+        isDark={isDark}
+      />
     </div>
   );
 };

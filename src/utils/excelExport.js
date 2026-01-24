@@ -137,11 +137,12 @@ export const exportFees = (fees) => {
  */
 export const exportAttendance = (attendance) => {
   const columns = [
-    { header: 'Date', accessor: (a) => a.date ? new Date(a.date).toLocaleDateString('en-IN') : '' },
-    { header: 'Student Name', accessor: (a) => a.student?.fullName || '' },
-    { header: 'Admission No', accessor: (a) => a.student?.admissionNumber || '' },
-    { header: 'Class', accessor: (a) => a.class?.name || '' },
-    { header: 'Status', accessor: (a) => a.status },
+    { header: 'Date', accessor: (a) => a.date ? new Date(a.date).toLocaleDateString('en-PK') : '' },
+    { header: 'Student Name', accessor: (a) => a.name || a.student?.fullName || a.fullName || '' },
+    { header: 'Roll Number', accessor: (a) => a.rollNumber || a.student?.rollNumber || '' },
+    { header: 'Admission No', accessor: (a) => a.admissionNumber || a.student?.admissionNumber || '' },
+    { header: 'Class', accessor: (a) => a.class || a.student?.class?.name || '' },
+    { header: 'Status', accessor: (a) => a.status || 'N/A' },
     { header: 'Remarks', accessor: (a) => a.remarks || '' },
   ];
 

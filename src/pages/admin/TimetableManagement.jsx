@@ -80,29 +80,28 @@ export default function TimetableManagement({ isDark }) {
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
-    (async () => {
+    const loadInitialData = async () => {
       try {
-        const s = await listSubjects();
-        setSubjects(s.data || s || []);
-      } catch (e) {
-        console.error("Subject load error:", e);
-        toast.error("Failed to load subjects");
-      }
-    })();
-  }, []);
+        // Load subjects
+        const subjectsRes = await listSubjects();
+        const subjectsData = subjectsRes?.data?.data || subjectsRes?.data || subjectsRes || [];
+        setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const c = await listClasses();
-        setClasses(c.data.data || c || []);
-        const t = await listTeachers();
-        setTeachers(t.data || t || []);
+        // Load classes
+        const classesRes = await listClasses();
+        const classesData = classesRes?.data?.data || classesRes?.data || classesRes || [];
+        setClasses(Array.isArray(classesData) ? classesData : []);
+
+        // Load teachers
+        const teachersRes = await listTeachers();
+        const teachersData = teachersRes?.data?.data || teachersRes?.data || teachersRes || [];
+        setTeachers(Array.isArray(teachersData) ? teachersData : []);
       } catch (e) {
         console.error("Data load error:", e);
         toast.error("Failed to load data");
       }
-    })();
+    };
+    loadInitialData();
   }, []);
 
   // Update time slots when period changes

@@ -1,11 +1,12 @@
 // pages/adminDashboard.jsx
 import { useState } from "react";
+import React from "react";
 import useTheme from "../../context/ThemeContext";
 import Navbar from '../../components/admin/AdminNavbar';
 import Sidebar from '../../components/admin/AdminSidebar';
 import MainContent from '../../components/admin/AdminMainContent';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
 
@@ -50,7 +51,17 @@ export default function AdminDashboard() {
         <div className={`flex-1 transition-all duration-300 ${
           isSidebarOpen ? 'lg:ml-72' : 'lg:ml-72'
         }`}>
-          <MainContent isDark={isDark} activeTab={activeTab} setActiveTab={setActiveTab} />
+          {children ? (
+            // Render children with isDark prop if children exist
+            React.Children.map(children, child =>
+              React.isValidElement(child)
+                ? React.cloneElement(child, { isDark })
+                : child
+            )
+          ) : (
+            // Fall back to MainContent for default dashboard
+            <MainContent isDark={isDark} activeTab={activeTab} setActiveTab={setActiveTab} />
+          )}
         </div>
       </div>
     </div>

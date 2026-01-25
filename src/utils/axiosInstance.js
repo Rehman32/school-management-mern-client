@@ -5,8 +5,21 @@
 
 import axios from 'axios';
 
-// API Base URL - Uses environment variable in production
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// API Base URL - Check multiple env variable names for flexibility
+// Supports: VITE_API_URL or VITE_API_BASE_URL
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) {
+    // Remove trailing slash if present
+    const cleanUrl = envUrl.replace(/\/$/, '');
+    // Add /api if not already present
+    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  }
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiUrl();
+console.log('🌐 API Base URL:', API_BASE_URL); // Helpful for debugging
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
